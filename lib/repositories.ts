@@ -94,6 +94,12 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install
+      - name: Prepare Hexo theme
+        run: |
+          if [ ! -d themes/landscape ] && [ -d node_modules/hexo-theme-landscape ]; then
+            mkdir -p themes
+            cp -R node_modules/hexo-theme-landscape themes/landscape
+          fi
       - name: Build Hexo site
         run: |
           pwd

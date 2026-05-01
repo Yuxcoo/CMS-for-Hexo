@@ -139,6 +139,8 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 
 如果 workflow 在 `Verify generated site` 步骤报 `public: No such file or directory`，通常是旧仓库缺少 `hexo-cli` 依赖。重新部署最新版 CMS 后，在“仓库”页点击“补全当前仓库”，它会合并更新 `package.json`，补上 `hexo-cli` 和缺失的 Hexo 基础依赖。
 
+如果已安装 `hexo-theme-landscape` 但仍未生成 `public`，可能是 Hexo 没有在 `themes/landscape` 目录找到主题。新版 workflow 会在构建前把 `node_modules/hexo-theme-landscape` 同步到 `themes/landscape`。
+
 ## 站点配置
 
 “配置”页可以编辑 Hexo 根目录 `_config.yml`，支持常用字段表单和完整 YAML 两种模式。保存前会校验 YAML 是否能解析为对象。
