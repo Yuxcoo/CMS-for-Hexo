@@ -1,6 +1,6 @@
 import { getConfig } from './config';
 import { createRepository, fileExists, getAuthenticatedUser, getFile, listAccessibleRepos, putFile } from './github';
-import { setRepoContext, type RepoContext } from './repo-context';
+import { getRepoContext, setRepoContext, type RepoContext } from './repo-context';
 
 const starterPackageJson = {
   private: true,
@@ -104,11 +104,20 @@ jobs:
         run: |
           pwd
           ls -la
-          npx hexo --version
-          npx hexo clean
-          npx hexo generate
+          test -f package.json
+          test -f _config.yml
+          ./node_modules/.bin/hexo --version
+          ./node_modules/.bin/hexo clean
+          ./node_modules/.bin/hexo generate --debug
       - name: Verify generated site
         run: |
+          if [ ! -d public ]; then
+            echo "Hexo did not create the public directory. Repository root contents:"
+            ls -la
+            echo "Source directory contents:"
+            find source -maxdepth 3 -type f -print || true
+            exit 1
+          fi
           ls -la public
           test -f public/index.html
       - name: Publish to gh-pages
@@ -194,7 +203,7 @@ export async function createHexoRepository(params: { name: string; description?:
 
 export async function initializeHexoRepository(context?: RepoContext) {
   const config = getConfig();
-  const target = context || { owner: config.GITHUB_OWNER || 'owner', repo: config.GITHUB_REPO || 'hexo-blog' };
+  const target = context || getRepoContext();
   const now = new Date().toISOString();
   const files: StarterFile[] = [
     { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n`, overwrite: true, merge: mergePackageJson },
@@ -212,11 +221,11 @@ export async function initializeHexoRepository(context?: RepoContext) {
 
   const created: string[] = [];
   for (const file of files) {
-    const existing = await fileExists(file.path, context);
+    const existing = await fileExists(file.path, target);
     if (existing && !file.overwrite) continue;
-    const current = existing ? await getFile(file.path, context) : null;
+    const current = existing ? await getFile(file.path, target) : null;
     const content = current && file.merge ? file.merge(current.content) : file.content;
-    await putFile({ path: file.path, content, sha: current?.sha, message: `${existing ? 'Update' : 'Initialize'} Hexo file: ${file.path}`, context });
+    await putFile({ path: file.path, content, sha: current?.sha, message: `${existing ? 'Update' : 'Initialize'} Hexo file: ${file.path}`, context: target });
     created.push(file.path);
   }
   return { created };
