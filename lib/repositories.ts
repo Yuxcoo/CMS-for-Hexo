@@ -87,7 +87,13 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Build Hexo site
-        run: npm run build
+        run: |
+          npx hexo clean
+          npx hexo generate
+      - name: Verify generated site
+        run: |
+          ls -la public
+          test -f public/index.html
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:

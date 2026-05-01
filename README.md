@@ -124,11 +124,18 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 
 新建仓库会通过 GitHub Actions 自动安装 Hexo 依赖、构建静态文件，并发布到 `gh-pages` 分支。创建后需要在 GitHub 仓库 Settings → Pages 中设置 Source 为 `Deploy from a branch`，分支选择 `gh-pages`，目录选择 `/ (root)`。
 
+访问地址通常是：
+
+- 用户/组织站点仓库：`https://<owner>.github.io/`
+- 普通项目仓库：`https://<owner>.github.io/<repo>/`
+
 如果“立即发布”提示找不到 workflow，可以在“仓库”页点击“补全当前仓库”，或手动在博客仓库中添加 `.github/workflows/pages.yml`。GitHub token 需要有 Actions 读写权限。
 
 如果 GitHub Pages workflow 报错 `Dependencies lock file is not found`，说明旧模板启用了 npm cache 但仓库没有 lockfile。重新部署最新版 CMS 后，在“仓库”页点击“补全当前仓库”，它会更新 `.github/workflows/pages.yml`。
 
 如果 GitHub Pages workflow 报错 `Resource not accessible by integration`、`Get Pages site failed` 或 `Pages site Not Found`，说明 GitHub Actions 默认 token 无法自动创建 Pages 站点。新版模板改为发布到 `gh-pages` 分支，避开 Pages API 权限限制。重新部署最新版 CMS 后，在“仓库”页点击“补全当前仓库”即可更新 workflow，然后在 GitHub Pages 设置里选择 `gh-pages / root`。
+
+如果 `gh-pages` 分支只有 `.nojekyll`，说明静态站点没有生成成功。新版 workflow 会在发布前检查 `public/index.html`，没有首页文件会直接失败并在 Actions 日志中显示 `public` 目录内容。
 
 ## 站点配置
 
