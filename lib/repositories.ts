@@ -12,6 +12,7 @@ const starterPackageJson = {
   },
   dependencies: {
     hexo: '^7.3.0',
+    'hexo-cli': '^4.3.2',
     'hexo-generator-archive': '^2.0.0',
     'hexo-generator-category': '^2.0.0',
     'hexo-generator-index': '^4.0.0',
@@ -22,6 +23,13 @@ const starterPackageJson = {
     'hexo-server': '^3.0.0',
     'hexo-theme-landscape': '^1.1.0'
   }
+};
+
+type StarterFile = {
+  path: string;
+  content: string;
+  overwrite: boolean;
+  merge?: (current: string) => string;
 };
 
 function getSiteUrl(context: RepoContext) {
@@ -88,6 +96,9 @@ jobs:
         run: npm install
       - name: Build Hexo site
         run: |
+          pwd
+          ls -la
+          npx hexo --version
           npx hexo clean
           npx hexo generate
       - name: Verify generated site
@@ -129,6 +140,25 @@ Expected site URL: ${getSiteUrl(context)}
 `;
 }
 
+function mergePackageJson(current: string) {
+  const parsed = JSON.parse(current || '{}') as {
+    private?: boolean;
+    scripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  return `${JSON.stringify(
+    {
+      ...parsed,
+      private: parsed.private ?? starterPackageJson.private,
+      scripts: { ...starterPackageJson.scripts, ...(parsed.scripts || {}) },
+      dependencies: { ...starterPackageJson.dependencies, ...(parsed.dependencies || {}) }
+    },
+    null,
+    2
+  )}\n`;
+}
+
 export async function listRepositories() {
   const repos = await listAccessibleRepos();
   return repos.map((repo) => ({
@@ -160,8 +190,8 @@ export async function initializeHexoRepository(context?: RepoContext) {
   const config = getConfig();
   const target = context || { owner: config.GITHUB_OWNER || 'owner', repo: config.GITHUB_REPO || 'hexo-blog' };
   const now = new Date().toISOString();
-  const files = [
-    { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n`, overwrite: false },
+  const files: StarterFile[] = [
+    { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n`, overwrite: true, merge: mergePackageJson },
     { path: '_config.yml', content: starterConfig(target), overwrite: false },
     { path: '.github/workflows/pages.yml', content: pagesWorkflow, overwrite: true },
     { path: 'README.md', content: starterReadme(target), overwrite: false },
@@ -179,7 +209,8 @@ export async function initializeHexoRepository(context?: RepoContext) {
     const existing = await fileExists(file.path, context);
     if (existing && !file.overwrite) continue;
     const current = existing ? await getFile(file.path, context) : null;
-    await putFile({ path: file.path, content: file.content, sha: current?.sha, message: `${existing ? 'Update' : 'Initialize'} Hexo file: ${file.path}`, context });
+    const content = current && file.merge ? file.merge(current.content) : file.content;
+    await putFile({ path: file.path, content, sha: current?.sha, message: `${existing ? 'Update' : 'Initialize'} Hexo file: ${file.path}`, context });
     created.push(file.path);
   }
   return { created };
