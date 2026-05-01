@@ -60,6 +60,28 @@ Render 部署时选择 Docker Web Service，并把 `.env.example` 中的变量�
 
 Render 会自动注入 `PORT`，Next standalone server 可直接监听平台端口。若你的 Hexo 仓库通过 GitHub Actions 部署，填入 `GITHUB_WORKFLOW_ID` 后可在后台手动触发。
 
+## GHCR 镜像
+
+仓库包含 GitHub Actions 工作流 `.github/workflows/ghcr.yml`，会在以下场景构建并推送 Docker 镜像到 GitHub Container Registry：
+
+- push 到 `main`
+- push `v*.*.*` tag
+- 手动运行 workflow
+
+镜像地址：
+
+```bash
+docker pull ghcr.io/yuxcoo/cms-for-hexo:latest
+```
+
+运行镜像：
+
+```bash
+docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
+```
+
+如果包页面没有自动公开，在 GitHub 仓库的 Packages 页面把 package visibility 设置为 Public。
+
 ## 版本检查
 
 后台的“版本检查”页会读取博客仓库里的：
