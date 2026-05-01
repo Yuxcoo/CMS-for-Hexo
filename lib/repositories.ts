@@ -83,17 +83,19 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: 20
       - name: Install dependencies
-        run: npm install
+        run: |
+          node --version
+          npm install
+          node -e "require('hexo'); console.log('hexo package loaded')"
+          ./node_modules/.bin/hexo help generate
       - name: Prepare Hexo theme
         run: |
           if [ ! -d themes/landscape/layout ] && [ -d node_modules/hexo-theme-landscape ]; then
