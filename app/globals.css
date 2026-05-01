@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  background: #f7f8f5;
+  color: #172026;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f8f5;
+  color: #172026;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+.prose-preview h1,
+.prose-preview h2,
+.prose-preview h3 {
+  margin: 1rem 0 0.5rem;
+  font-weight: 700;
+}
+
+.prose-preview p,
+.prose-preview ul,
+.prose-preview ol,
+.prose-preview pre,
+.prose-preview table {
+  margin: 0.75rem 0;
+}
+
+.prose-preview pre {
+  overflow: auto;
+  border-radius: 8px;
+  background: #172026;
+  color: #f7f8f5;
+  padding: 1rem;
+}
+
+.prose-preview code {
+  background: rgba(23, 32, 38, 0.08);
+  border-radius: 4px;
+  padding: 0.1rem 0.25rem;
+}
+
+.prose-preview pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.prose-preview img {
+  max-width: 100%;
+  border-radius: 8px;
+}
