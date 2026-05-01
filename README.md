@@ -60,6 +60,8 @@ Render 部署时选择 Docker Web Service，并把 `.env.example` 中的变量�
 
 Render 会自动注入 `PORT`，Next standalone server 可直接监听平台端口。若你的 Hexo 仓库通过 GitHub Actions 部署，填入 `GITHUB_WORKFLOW_ID` 后可在后台手动触发。
 
+镜像内已显式设置 `HOSTNAME=0.0.0.0`，用于避免 Next standalone 在 Render 上绑定到容器 hostname 导致公网访问 502。
+
 ## GHCR 镜像
 
 仓库包含 GitHub Actions 工作流 `.github/workflows/ghcr.yml`，会在以下场景构建并推送 Docker 镜像到 GitHub Container Registry：
