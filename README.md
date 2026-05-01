@@ -132,12 +132,16 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 - `/login`：应显示登录页
 - `/api/health`：应返回 JSON
 
+`/api/health` 会返回 `auth.adminPasswordLength` 和 `auth.sessionSecretLength`，只显示长度不显示值，可用来确认云平台实际读取到的环境变量。
+
 登录只依赖：
 
 ```env
 ADMIN_PASSWORD=your-password
 SESSION_SECRET=at-least-16-characters
 ```
+
+`ADMIN_PASSWORD` 是登录密码；`SESSION_SECRET` 只用于签名 cookie，不是登录密码。云平台环境变量不要额外包引号，若平台自动保留前后空格或引号，应用会尽量兼容处理。
 
 进入后台后，文章、仓库、部署、版本检查等 GitHub 功能还需要：
 
