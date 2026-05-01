@@ -1,5 +1,5 @@
 import { getConfig } from './config';
-import { createRepository, fileExists, getAuthenticatedUser, listAccessibleRepos, putFile } from './github';
+import { createRepository, fileExists, getAuthenticatedUser, getFile, listAccessibleRepos, putFile } from './github';
 import { setRepoContext, type RepoContext } from './repo-context';
 
 const starterPackageJson = {
@@ -84,7 +84,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
         run: npm install
       - name: Build Hexo site
@@ -166,23 +165,25 @@ export async function initializeHexoRepository(context?: RepoContext) {
   const target = context || { owner: config.GITHUB_OWNER || 'owner', repo: config.GITHUB_REPO || 'hexo-blog' };
   const now = new Date().toISOString();
   const files = [
-    { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n` },
-    { path: '_config.yml', content: starterConfig(target) },
-    { path: '.github/workflows/pages.yml', content: pagesWorkflow },
-    { path: 'README.md', content: starterReadme(target) },
-    { path: `${config.HEXO_POSTS_DIR}/hello-cms-for-hexo.md`, content: `---\ntitle: Hello CMS for Hexo\ndate: ${now}\ntags:\n  - Hexo\n  - CMS\ncategories:\n  - Blog\n---\n\nWelcome to your new Hexo blog. This post was created by CMS for Hexo.\n\nOpen the CMS, edit this article, add images, and publish changes through GitHub Actions.\n` },
-    { path: 'source/about/index.md', content: `---\ntitle: About\ndate: ${now}\n---\n\nThis blog is managed with CMS for Hexo.\n` },
-    { path: 'scaffolds/post.md', content: '---\ntitle: {{ title }}\ndate: {{ date }}\ntags:\ncategories:\n---\n' },
-    { path: 'scaffolds/draft.md', content: '---\ntitle: {{ title }}\ntags:\ncategories:\n---\n' },
-    { path: 'scaffolds/page.md', content: '---\ntitle: {{ title }}\ndate: {{ date }}\n---\n' },
-    { path: `${config.HEXO_DRAFTS_DIR}/.gitkeep`, content: '' },
-    { path: `${config.HEXO_IMAGES_DIR}/.gitkeep`, content: '' }
+    { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n`, overwrite: false },
+    { path: '_config.yml', content: starterConfig(target), overwrite: false },
+    { path: '.github/workflows/pages.yml', content: pagesWorkflow, overwrite: true },
+    { path: 'README.md', content: starterReadme(target), overwrite: false },
+    { path: `${config.HEXO_POSTS_DIR}/hello-cms-for-hexo.md`, content: `---\ntitle: Hello CMS for Hexo\ndate: ${now}\ntags:\n  - Hexo\n  - CMS\ncategories:\n  - Blog\n---\n\nWelcome to your new Hexo blog. This post was created by CMS for Hexo.\n\nOpen the CMS, edit this article, add images, and publish changes through GitHub Actions.\n`, overwrite: false },
+    { path: 'source/about/index.md', content: `---\ntitle: About\ndate: ${now}\n---\n\nThis blog is managed with CMS for Hexo.\n`, overwrite: false },
+    { path: 'scaffolds/post.md', content: '---\ntitle: {{ title }}\ndate: {{ date }}\ntags:\ncategories:\n---\n', overwrite: false },
+    { path: 'scaffolds/draft.md', content: '---\ntitle: {{ title }}\ntags:\ncategories:\n---\n', overwrite: false },
+    { path: 'scaffolds/page.md', content: '---\ntitle: {{ title }}\ndate: {{ date }}\n---\n', overwrite: false },
+    { path: `${config.HEXO_DRAFTS_DIR}/.gitkeep`, content: '', overwrite: false },
+    { path: `${config.HEXO_IMAGES_DIR}/.gitkeep`, content: '', overwrite: false }
   ];
 
   const created: string[] = [];
   for (const file of files) {
-    if (await fileExists(file.path, context)) continue;
-    await putFile({ path: file.path, content: file.content, message: `Initialize Hexo file: ${file.path}`, context });
+    const existing = await fileExists(file.path, context);
+    if (existing && !file.overwrite) continue;
+    const current = existing ? await getFile(file.path, context) : null;
+    await putFile({ path: file.path, content: file.content, sha: current?.sha, message: `${existing ? 'Update' : 'Initialize'} Hexo file: ${file.path}`, context });
     created.push(file.path);
   }
   return { created };

@@ -126,6 +126,8 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 
 如果“立即发布”提示找不到 workflow，可以在“仓库”页点击“补全当前仓库”，或手动在博客仓库中添加 `.github/workflows/pages.yml`。GitHub token 需要有 Actions 读写权限。
 
+如果 GitHub Pages workflow 报错 `Dependencies lock file is not found`，说明旧模板启用了 npm cache 但仓库没有 lockfile。重新部署最新版 CMS 后，在“仓库”页点击“补全当前仓库”，它会更新 `.github/workflows/pages.yml`。
+
 ## 站点配置
 
 “配置”页可以编辑 Hexo 根目录 `_config.yml`，支持常用字段表单和完整 YAML 两种模式。保存前会校验 YAML 是否能解析为对象。
