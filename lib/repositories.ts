@@ -3,10 +3,12 @@ import { createRepository, fileExists, getAuthenticatedUser, listAccessibleRepos
 import { setRepoContext, type RepoContext } from './repo-context';
 
 const starterPackageJson = {
+  private: true,
   scripts: {
     clean: 'hexo clean',
     build: 'hexo generate',
-    server: 'hexo server'
+    server: 'hexo server',
+    deploy: 'hexo generate'
   },
   dependencies: {
     hexo: '^7.3.0',
@@ -22,19 +24,115 @@ const starterPackageJson = {
   }
 };
 
-const starterConfig = `title: My Hexo Blog
-subtitle: ''
-description: ''
-author: Admin
+function getSiteUrl(context: RepoContext) {
+  const isUserPage = context.repo.toLowerCase() === `${context.owner.toLowerCase()}.github.io`;
+  return `https://${context.owner}.github.io${isUserPage ? '' : `/${context.repo}`}`;
+}
+
+function getSiteRoot(context: RepoContext) {
+  return context.repo.toLowerCase() === `${context.owner.toLowerCase()}.github.io` ? '/' : `/${context.repo}/`;
+}
+
+function starterConfig(context: RepoContext) {
+  return `title: My Hexo Blog
+subtitle: Powered by CMS for Hexo
+description: A Hexo blog managed from a browser admin panel.
+author: ${context.owner}
 language: zh-CN
 timezone: Asia/Shanghai
-url: https://example.com
-root: /
+url: ${getSiteUrl(context)}
+root: ${getSiteRoot(context)}
 permalink: :year/:month/:day/:title/
+pretty_urls:
+  trailing_index: true
+  trailing_html: true
 theme: landscape
+highlight:
+  enable: true
+  line_number: true
+  auto_detect: false
+  tab_replace: ''
 deploy:
   type: ''
 `;
+}
+
+const pagesWorkflow = `name: Deploy Hexo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Build Hexo site
+        run: npm run build
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  deploy:
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+`;
+
+function starterReadme(context: RepoContext) {
+  return `# ${context.repo}
+
+This is a Hexo blog repository initialized by CMS for Hexo.
+
+## Local preview
+
+\`\`\`bash
+npm install
+npm run server
+\`\`\`
+
+## Build
+
+\`\`\`bash
+npm run build
+\`\`\`
+
+## Publish
+
+GitHub Actions builds the site and publishes it to GitHub Pages.
+
+Expected site URL: ${getSiteUrl(context)}
+`;
+}
 
 export async function listRepositories() {
   const repos = await listAccessibleRepos();
@@ -65,10 +163,18 @@ export async function createHexoRepository(params: { name: string; description?:
 
 export async function initializeHexoRepository(context?: RepoContext) {
   const config = getConfig();
+  const target = context || { owner: config.GITHUB_OWNER || 'owner', repo: config.GITHUB_REPO || 'hexo-blog' };
+  const now = new Date().toISOString();
   const files = [
     { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n` },
-    { path: '_config.yml', content: starterConfig },
-    { path: `${config.HEXO_POSTS_DIR}/hello-cms-for-hexo.md`, content: '---\ntitle: Hello CMS for Hexo\ndate: 2026-05-01T00:00:00.000Z\ntags:\n  - Hexo\ncategories:\n  - Blog\n---\n\nThis post was created by CMS for Hexo.\n' },
+    { path: '_config.yml', content: starterConfig(target) },
+    { path: '.github/workflows/pages.yml', content: pagesWorkflow },
+    { path: 'README.md', content: starterReadme(target) },
+    { path: `${config.HEXO_POSTS_DIR}/hello-cms-for-hexo.md`, content: `---\ntitle: Hello CMS for Hexo\ndate: ${now}\ntags:\n  - Hexo\n  - CMS\ncategories:\n  - Blog\n---\n\nWelcome to your new Hexo blog. This post was created by CMS for Hexo.\n\nOpen the CMS, edit this article, add images, and publish changes through GitHub Actions.\n` },
+    { path: 'source/about/index.md', content: `---\ntitle: About\ndate: ${now}\n---\n\nThis blog is managed with CMS for Hexo.\n` },
+    { path: 'scaffolds/post.md', content: '---\ntitle: {{ title }}\ndate: {{ date }}\ntags:\ncategories:\n---\n' },
+    { path: 'scaffolds/draft.md', content: '---\ntitle: {{ title }}\ntags:\ncategories:\n---\n' },
+    { path: 'scaffolds/page.md', content: '---\ntitle: {{ title }}\ndate: {{ date }}\n---\n' },
     { path: `${config.HEXO_DRAFTS_DIR}/.gitkeep`, content: '' },
     { path: `${config.HEXO_IMAGES_DIR}/.gitkeep`, content: '' }
   ];

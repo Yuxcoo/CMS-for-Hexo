@@ -10,7 +10,7 @@ const nav = [
   { href: '/posts', label: '文章', icon: FileText },
   { href: '/drafts', label: '草稿', icon: ScrollText },
   { href: '/media', label: '图片', icon: Image },
-  { href: '/deploy', label: '部署', icon: Rocket },
+  { href: '/publish', label: '发布', icon: Rocket },
   { href: '/versions', label: '版本', icon: Settings2 },
   { href: '/settings', label: '配置', icon: SlidersHorizontal },
   { href: '/repository', label: '仓库', icon: Github }

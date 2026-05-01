@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const authConfigSchema = z.object({
   ADMIN_PASSWORD: z.string().min(1),
-  SESSION_SECRET: z.string().min(16)
+  SESSION_SECRET: z.string().min(1)
 });
 
 const configSchema = authConfigSchema.extend({

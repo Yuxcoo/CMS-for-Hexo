@@ -19,7 +19,7 @@ export function DashboardClient() {
     { href: '/posts', title: '写文章', desc: '新建、编辑、删除 Hexo 文章', icon: FileText },
     { href: '/drafts', title: '草稿箱', desc: '保存想法，准备好再发布', icon: FileText },
     { href: '/media', title: '图片库', desc: '上传图片并复制 Markdown 链接', icon: Image },
-    { href: '/deploy', title: '部署状态', desc: '查看提交和 GitHub Actions', icon: Rocket },
+    { href: '/publish', title: '发布中心', desc: '发布博客并查看发布记录', icon: Rocket },
     { href: '/versions', title: '版本检查', desc: '检查 Hexo、主题和插件版本', icon: Settings2 }
   ];
 

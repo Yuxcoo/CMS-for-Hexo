@@ -8,7 +8,7 @@ export default function DashboardPage() {
   if (!isAuthenticated()) redirect('/login');
   return (
     <AppShell>
-      <PageHeader title="仪表盘" description="管理你的 Hexo 仓库、内容与部署状态。" />
+      <PageHeader title="仪表盘" description="管理你的 Hexo 仓库、内容与发布状态。" />
       <DashboardClient />
     </AppShell>
   );

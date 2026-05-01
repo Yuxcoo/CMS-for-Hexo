@@ -1,6 +1,6 @@
 # CMS for Hexo
 
-一个个人自用的 Hexo 博客后台。它通过 GitHub API 管理 Hexo 仓库里的 Markdown、图片、配置与部署状态，可用 Docker 部署到 Render、Railway、Fly.io 或 VPS。
+一个个人自用的 Hexo 博客后台。它通过 GitHub API 管理 Hexo 仓库里的 Markdown、图片、配置与发布状态，可用 Docker 部署到 Render、Railway、Fly.io 或 VPS。
 
 ## 功能
 
@@ -9,7 +9,7 @@
 - 草稿列表、创建、编辑、发布、转草稿
 - Markdown 编辑与预览
 - 图片上传到 Hexo 仓库目录并生成 Markdown 链接
-- 最近提交、GitHub Actions 状态、手动触发 workflow
+- 发布中心、GitHub Actions 状态、手动触发发布
 - 检查 Hexo、主题与插件依赖版本，辅助更新判断
 - Docker 生产部署
 
@@ -19,7 +19,7 @@
 
 ```env
 ADMIN_PASSWORD=change-me
-SESSION_SECRET=replace-with-a-long-random-string
+SESSION_SECRET=replace-with-a-random-string
 GITHUB_TOKEN=github_pat_xxx
 GITHUB_OWNER=your-github-user-or-org
 GITHUB_REPO=your-hexo-repo
@@ -27,7 +27,7 @@ GITHUB_BRANCH=main
 HEXO_POSTS_DIR=source/_posts
 HEXO_DRAFTS_DIR=source/_drafts
 HEXO_IMAGES_DIR=source/images
-GITHUB_WORKFLOW_ID=deploy.yml
+GITHUB_WORKFLOW_ID=pages.yml
 ```
 
 `GITHUB_OWNER` 和 `GITHUB_REPO` 可以预先填写，也可以留空。留空时，登录后台后进入“仓库”页面，选择已有仓库或创建一个新的 Hexo 仓库。
@@ -35,7 +35,7 @@ GITHUB_WORKFLOW_ID=deploy.yml
 GitHub fine-grained token 建议授权目标 Hexo 仓库；如果需要在后台新建仓库，需要 token 具备创建仓库能力。至少需要：
 
 - Contents: Read and write
-- Actions: Read and write，若要查看和触发部署 workflow
+- Actions: Read and write，若要查看和触发发布 workflow
 - Metadata: Read
 
 如果要列出并新建个人仓库，classic token 需要 `repo` 权限；fine-grained token 对“创建仓库”的支持取决于 GitHub 当前权限模型。
@@ -58,7 +58,7 @@ docker run --env-file .env.local -p 3000:3000 cms-for-hexo
 
 Render 部署时选择 Docker Web Service，并把 `.env.example` 中的变量填入 Render Environment。
 
-Render 会自动注入 `PORT`，Next standalone server 可直接监听平台端口。若你的 Hexo 仓库通过 GitHub Actions 部署，填入 `GITHUB_WORKFLOW_ID` 后可在后台手动触发。
+Render 会自动注入 `PORT`，Next standalone server 可直接监听平台端口。若你的 Hexo 仓库通过 GitHub Actions 发布，填入 `GITHUB_WORKFLOW_ID` 后可在后台“发布”页面手动触发；未填写时默认尝试触发新建仓库模板里的 `pages.yml`。
 
 镜像内已显式设置 `HOSTNAME=0.0.0.0`，用于避免 Next standalone 在 Render 上绑定到容器 hostname 导致公网访问 502。
 
@@ -104,17 +104,25 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 后台的“仓库”页支持两种模式：
 
 - 连接已有仓库：从当前 token 可访问的仓库中选择一个作为 Hexo 存储仓库
-- 创建新仓库：调用 GitHub API 创建仓库，并写入基础 Hexo 文件
+- 创建新仓库：调用 GitHub API 创建仓库，并写入可直接构建发布的 Hexo 项目
 
 初始化会写入：
 
 - `package.json`
 - `_config.yml`
+- `.github/workflows/pages.yml`
+- `README.md`
 - `source/_posts/hello-cms-for-hexo.md`
+- `source/about/index.md`
+- `scaffolds/post.md`
+- `scaffolds/draft.md`
+- `scaffolds/page.md`
 - `source/_drafts/.gitkeep`
 - `source/images/.gitkeep`
 
 当前选择的仓库保存在 HTTP-only cookie 中；如果环境变量里预设了 `GITHUB_OWNER` 和 `GITHUB_REPO`，则会作为默认仓库。
+
+新建仓库会通过 GitHub Actions 自动安装 Hexo 依赖、构建静态文件，并发布到 GitHub Pages。创建后需要在 GitHub 仓库 Settings → Pages 中确认 Source 使用 GitHub Actions。
 
 ## 站点配置
 
@@ -140,12 +148,12 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 
 ```env
 ADMIN_PASSWORD=your-password
-SESSION_SECRET=at-least-16-characters
+SESSION_SECRET=any-random-string
 ```
 
-`ADMIN_PASSWORD` 是登录密码；`SESSION_SECRET` 只用于签名 cookie，不是登录密码。云平台环境变量不要额外包引号，若平台自动保留前后空格或引号，应用会尽量兼容处理。
+`ADMIN_PASSWORD` 是登录密码；`SESSION_SECRET` 只用于签名 cookie，不是登录密码。`SESSION_SECRET` 只要求非空，但生产环境建议使用随机长字符串。云平台环境变量不要额外包引号，若平台自动保留前后空格或引号，应用会尽量兼容处理。
 
-进入后台后，文章、仓库、部署、版本检查等 GitHub 功能还需要：
+进入后台后，文章、仓库、发布、版本检查等 GitHub 功能还需要：
 
 ```env
 GITHUB_TOKEN=github_pat_or_classic_token

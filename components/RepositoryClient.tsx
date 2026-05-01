@@ -79,7 +79,7 @@ export function RepositoryClient() {
   return (
     <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
       <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-        <h2 className="mb-4 text-lg font-bold">新建 Hexo 仓库</h2>
+        <h2 className="mb-4 text-lg font-bold">新建博客仓库</h2>
         <div className="grid gap-4">
           <Field label="仓库名">
             <TextInput value={name} onChange={(event) => setName(event.target.value)} />
@@ -90,8 +90,8 @@ export function RepositoryClient() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /> 私有仓库
           </label>
-          <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />创建并初始化</Button>
-          <Button variant="secondary" onClick={initializeCurrent} disabled={busy}><Wand2 size={17} />初始化当前仓库</Button>
+          <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />创建可发布博客</Button>
+          <Button variant="secondary" onClick={initializeCurrent} disabled={busy}><Wand2 size={17} />补全当前仓库</Button>
           {message ? <p className="break-all rounded-md bg-[#eef2ee] px-3 py-2 text-sm">{message}</p> : null}
         </div>
       </section>

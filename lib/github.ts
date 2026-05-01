@@ -122,17 +122,21 @@ export async function listRecentCommits(): Promise<GitHubCommit[]> {
 
 export async function listWorkflowRuns(): Promise<WorkflowRun[]> {
   const config = getConfig();
-  const suffix = config.GITHUB_WORKFLOW_ID
-    ? `/actions/workflows/${encodeURIComponent(config.GITHUB_WORKFLOW_ID)}/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`
-    : `/actions/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`;
-  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(suffix));
+  const workflowId = config.GITHUB_WORKFLOW_ID || 'pages.yml';
+  const suffix = `/actions/workflows/${encodeURIComponent(workflowId)}/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`;
+  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(suffix)).catch(async (error) => {
+    if (!config.GITHUB_WORKFLOW_ID && String(error).includes('404')) {
+      return githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(`/actions/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
+    }
+    throw error;
+  });
   return result.workflow_runs;
 }
 
 export async function dispatchWorkflow() {
   const config = getConfig();
-  if (!config.GITHUB_WORKFLOW_ID) throw new Error('GITHUB_WORKFLOW_ID is not configured');
-  return githubFetch<void>(repoApiPath(`/actions/workflows/${encodeURIComponent(config.GITHUB_WORKFLOW_ID)}/dispatches`), {
+  const workflowId = config.GITHUB_WORKFLOW_ID || 'pages.yml';
+  return githubFetch<void>(repoApiPath(`/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`), {
     method: 'POST',
     body: JSON.stringify({ ref: config.GITHUB_BRANCH })
   });
