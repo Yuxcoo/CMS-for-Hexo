@@ -96,10 +96,17 @@ jobs:
         run: npm install
       - name: Prepare Hexo theme
         run: |
-          if [ ! -d themes/landscape ] && [ -d node_modules/hexo-theme-landscape ]; then
+          if [ ! -d themes/landscape/layout ] && [ -d node_modules/hexo-theme-landscape ]; then
+            rm -rf themes/landscape
             mkdir -p themes
             cp -R node_modules/hexo-theme-landscape themes/landscape
           fi
+          if grep -Eq '^[[:space:]]*theme:[[:space:]]*landscape[[:space:]]*$' _config.yml && [ ! -d themes/landscape/layout ]; then
+            echo "::error::Theme landscape is configured, but themes/landscape/layout is missing."
+            find themes -maxdepth 3 -type f -print || true
+            exit 1
+          fi
+          find themes -maxdepth 3 -type f -print | sort | head -80
       - name: Build Hexo site
         run: |
           pwd
@@ -108,14 +115,27 @@ jobs:
           test -f _config.yml
           ./node_modules/.bin/hexo --version
           ./node_modules/.bin/hexo clean
-          ./node_modules/.bin/hexo generate --debug
+          ./node_modules/.bin/hexo --debug generate
+          test -f db.json
+          ./node_modules/.bin/hexo list route || true
+          find . -maxdepth 2 -type d -name public -print
       - name: Verify generated site
         run: |
           if [ ! -d public ]; then
             echo "Hexo did not create the public directory. Repository root contents:"
             ls -la
+            echo "Hexo config:"
+            sed -n '1,180p' _config.yml
+            echo "Installed top-level packages:"
+            npm ls --depth=0 || true
+            echo "Theme directory contents:"
+            find themes -maxdepth 4 -type f -print | sort | head -120 || true
             echo "Source directory contents:"
             find source -maxdepth 3 -type f -print || true
+            echo "Hexo database:"
+            ls -la db.json || true
+            echo "Hexo routes:"
+            ./node_modules/.bin/hexo list route || true
             exit 1
           fi
           ls -la public
