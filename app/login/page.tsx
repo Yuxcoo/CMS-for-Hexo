@@ -22,7 +22,8 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (!response.ok) {
-      setError('密码不正确');
+      const result = await response.json().catch(() => ({ error: '登录失败' }));
+      setError(result.error || '登录失败');
       return;
     }
     router.push('/dashboard');

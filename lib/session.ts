@@ -1,12 +1,12 @@
 import { cookies } from 'next/headers';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { getConfig } from './config';
+import { getAuthConfig } from './config';
 
 const COOKIE_NAME = 'cms_for_hexo_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 14;
 
 function sign(value: string): string {
-  return createHmac('sha256', getConfig().SESSION_SECRET).update(value).digest('base64url');
+  return createHmac('sha256', getAuthConfig().SESSION_SECRET).update(value).digest('base64url');
 }
 
 function safeEqual(a: string, b: string): boolean {

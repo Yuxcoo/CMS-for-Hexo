@@ -124,3 +124,29 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 - `themes/<theme>/_config.yml`
 
 如果都不存在，会默认创建 `_config.<theme>.yml`。
+
+## 云部署排障
+
+如果云平台能启动容器，但浏览器访问异常，先测试：
+
+- `/login`：应显示登录页
+- `/api/health`：应返回 JSON
+
+登录只依赖：
+
+```env
+ADMIN_PASSWORD=your-password
+SESSION_SECRET=at-least-16-characters
+```
+
+进入后台后，文章、仓库、部署、版本检查等 GitHub 功能还需要：
+
+```env
+GITHUB_TOKEN=github_pat_or_classic_token
+GITHUB_BRANCH=main
+HEXO_POSTS_DIR=source/_posts
+HEXO_DRAFTS_DIR=source/_drafts
+HEXO_IMAGES_DIR=source/images
+```
+
+`GITHUB_OWNER` 和 `GITHUB_REPO` 可以留空，之后在“仓库”页选择或创建。若登录提示 `Missing or invalid auth environment variables`，说明 `ADMIN_PASSWORD` 或 `SESSION_SECRET` 没有在平台环境变量里正确配置。

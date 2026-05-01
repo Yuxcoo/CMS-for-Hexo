@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
-const configSchema = z.object({
+const authConfigSchema = z.object({
   ADMIN_PASSWORD: z.string().min(1),
-  SESSION_SECRET: z.string().min(16),
+  SESSION_SECRET: z.string().min(16)
+});
+
+const configSchema = authConfigSchema.extend({
   GITHUB_TOKEN: z.string().min(1),
   GITHUB_OWNER: z.string().optional(),
   GITHUB_REPO: z.string().optional(),
@@ -14,8 +17,21 @@ const configSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
+export type AuthConfig = z.infer<typeof authConfigSchema>;
 
 let cachedConfig: AppConfig | null = null;
+let cachedAuthConfig: AuthConfig | null = null;
+
+export function getAuthConfig(): AuthConfig {
+  if (cachedAuthConfig) return cachedAuthConfig;
+  const parsed = authConfigSchema.safeParse(process.env);
+  if (!parsed.success) {
+    const details = parsed.error.issues.map((issue) => issue.path.join('.')).join(', ');
+    throw new Error(`Missing or invalid auth environment variables: ${details}`);
+  }
+  cachedAuthConfig = parsed.data;
+  return cachedAuthConfig;
+}
 
 export function getConfig(): AppConfig {
   if (cachedConfig) return cachedConfig;
