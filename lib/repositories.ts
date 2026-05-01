@@ -95,7 +95,6 @@ jobs:
           node --version
           npm install
           node -e "require('hexo'); console.log('hexo package loaded')"
-          ./node_modules/.bin/hexo help generate
       - name: Prepare Hexo theme
         run: |
           if [ ! -d themes/landscape/layout ] && [ -d node_modules/hexo-theme-landscape ]; then
@@ -115,10 +114,23 @@ jobs:
           ls -la
           test -f package.json
           test -f _config.yml
-          ./node_modules/.bin/hexo --version
-          ./node_modules/.bin/hexo clean
-          if ! ./node_modules/.bin/hexo --debug generate; then
-            echo "Hexo generate failed. Repository root contents:"
+          node <<'NODE'
+          const Hexo = require('hexo');
+          const hexo = new Hexo(process.cwd(), { debug: true });
+          async function main() {
+            await hexo.init();
+            await hexo.call('clean');
+            await hexo.call('generate');
+            await hexo.exit();
+          }
+          main().catch(async (error) => {
+            console.error(error);
+            try { await hexo.exit(error); } catch {}
+            process.exit(1);
+          });
+          NODE
+          if [ ! -d public ]; then
+            echo "Hexo generate finished without creating public. Repository root contents:"
             ls -la
             echo "Hexo config:"
             sed -n '1,180p' _config.yml
@@ -130,11 +142,8 @@ jobs:
             find source -maxdepth 3 -type f -print || true
             echo "Hexo database:"
             ls -la db.json || true
-            echo "Hexo routes:"
-            ./node_modules/.bin/hexo list route || true
             exit 1
           fi
-          ./node_modules/.bin/hexo list route || true
           find . -maxdepth 2 -type d -name public -print
       - name: Verify generated site
         run: |
@@ -151,8 +160,6 @@ jobs:
             find source -maxdepth 3 -type f -print || true
             echo "Hexo database:"
             ls -la db.json || true
-            echo "Hexo routes:"
-            ./node_modules/.bin/hexo list route || true
             exit 1
           fi
           ls -la public
