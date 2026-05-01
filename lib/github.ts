@@ -1,7 +1,7 @@
 import { getConfig } from './config';
 import { assertSafeRepoPath } from './paths';
 import { getRepoContext, type RepoContext } from './repo-context';
-import type { GitHubCommit, GitHubFile, WorkflowRun } from '@/types/github';
+import type { GitHubCommit, GitHubFile, GitHubWorkflow, WorkflowRun } from '@/types/github';
 
 const apiBase = 'https://api.github.com';
 
@@ -122,22 +122,45 @@ export async function listRecentCommits(): Promise<GitHubCommit[]> {
 
 export async function listWorkflowRuns(): Promise<WorkflowRun[]> {
   const config = getConfig();
-  const workflowId = config.GITHUB_WORKFLOW_ID || 'pages.yml';
-  const suffix = `/actions/workflows/${encodeURIComponent(workflowId)}/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`;
-  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(suffix)).catch(async (error) => {
-    if (!config.GITHUB_WORKFLOW_ID && String(error).includes('404')) {
-      return githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(`/actions/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
-    }
-    throw error;
-  });
+  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(`/actions/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
   return result.workflow_runs;
+}
+
+export async function listWorkflows(): Promise<GitHubWorkflow[]> {
+  const result = await githubFetch<{ workflows: GitHubWorkflow[] }>(repoApiPath('/actions/workflows?per_page=100'));
+  return result.workflows;
+}
+
+export async function resolvePublishWorkflow(): Promise<GitHubWorkflow> {
+  const config = getConfig();
+  const workflows = await listWorkflows();
+  if (!workflows.length) {
+    throw new Error('当前仓库没有 GitHub Actions workflow。请先在仓库中添加发布 workflow，或用“仓库”页的“补全当前仓库”。');
+  }
+
+  if (config.GITHUB_WORKFLOW_ID) {
+    const configured = workflows.find((workflow) =>
+      String(workflow.id) === config.GITHUB_WORKFLOW_ID ||
+      workflow.path.endsWith(`/${config.GITHUB_WORKFLOW_ID}`) ||
+      workflow.name === config.GITHUB_WORKFLOW_ID
+    );
+    if (!configured) {
+      throw new Error(`找不到配置的发布 workflow：${config.GITHUB_WORKFLOW_ID}`);
+    }
+    return configured;
+  }
+
+  const preferredNames = ['pages.yml', 'pages.yaml', 'deploy.yml', 'deploy.yaml', 'gh-pages.yml', 'gh-pages.yaml'];
+  const preferred = workflows.find((workflow) => preferredNames.some((name) => workflow.path.endsWith(`/${name}`)));
+  return preferred || workflows[0];
 }
 
 export async function dispatchWorkflow() {
   const config = getConfig();
-  const workflowId = config.GITHUB_WORKFLOW_ID || 'pages.yml';
-  return githubFetch<void>(repoApiPath(`/actions/workflows/${encodeURIComponent(workflowId)}/dispatches`), {
+  const workflow = await resolvePublishWorkflow();
+  await githubFetch<void>(repoApiPath(`/actions/workflows/${workflow.id}/dispatches`), {
     method: 'POST',
     body: JSON.stringify({ ref: config.GITHUB_BRANCH })
   });
+  return workflow;
 }

@@ -30,3 +30,11 @@ export type WorkflowRun = {
   head_branch: string;
   head_sha: string;
 };
+
+export type GitHubWorkflow = {
+  id: number;
+  name: string;
+  path: string;
+  state: string;
+  html_url: string;
+};

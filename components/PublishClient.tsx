@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, CircleDashed, Clock3, ExternalLink, RefreshCw, Rocket, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import type { GitHubCommit, WorkflowRun } from '@/types/github';
+import type { GitHubCommit, GitHubWorkflow, WorkflowRun } from '@/types/github';
 
 function statusLabel(run: WorkflowRun) {
   if (run.status !== 'completed') return '发布中';
@@ -21,6 +21,7 @@ function StatusIcon({ run }: { run: WorkflowRun }) {
 export function PublishClient() {
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
+  const [publishWorkflow, setPublishWorkflow] = useState<GitHubWorkflow | null>(null);
   const [message, setMessage] = useState('');
 
   async function load() {
@@ -28,12 +29,13 @@ export function PublishClient() {
     const result = await response.json();
     setCommits(result.commits || []);
     setRuns(result.runs || []);
+    setPublishWorkflow(result.publishWorkflow || null);
   }
 
   async function dispatch() {
     const response = await fetch('/api/github/status', { method: 'POST' });
     const result = await response.json().catch(() => ({}));
-    setMessage(response.ok ? '已开始发布，稍后刷新查看结果。' : result.error || '发布失败');
+    setMessage(response.ok ? `已开始发布：${result.workflow?.name || 'GitHub Actions'}` : result.error || '发布失败');
     load();
   }
 
@@ -48,6 +50,7 @@ export function PublishClient() {
           <div>
             <h2 className="text-lg font-bold">发布中心</h2>
             <p className="mt-1 text-sm text-[#68746c]">保存文章会自动提交到仓库；这里可以手动触发一次完整发布，并查看最近发布结果。</p>
+            <p className="mt-2 text-sm text-[#68746c]">当前发布流程：{publishWorkflow ? `${publishWorkflow.name} (${publishWorkflow.path})` : '未检测到可触发的 workflow'}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={load}><RefreshCw size={17} />刷新</Button>

@@ -58,7 +58,7 @@ docker run --env-file .env.local -p 3000:3000 cms-for-hexo
 
 Render 部署时选择 Docker Web Service，并把 `.env.example` 中的变量填入 Render Environment。
 
-Render 会自动注入 `PORT`，Next standalone server 可直接监听平台端口。若你的 Hexo 仓库通过 GitHub Actions 发布，填入 `GITHUB_WORKFLOW_ID` 后可在后台“发布”页面手动触发；未填写时默认尝试触发新建仓库模板里的 `pages.yml`。
+Render 会自动注入 `PORT`，Next standalone server 可直接监听平台端口。若你的 Hexo 仓库通过 GitHub Actions 发布，填入 `GITHUB_WORKFLOW_ID` 后可指定后台“发布”页面触发的 workflow；未填写时会自动查找 `pages.yml`、`deploy.yml` 等常见发布 workflow。
 
 镜像内已显式设置 `HOSTNAME=0.0.0.0`，用于避免 Next standalone 在 Render 上绑定到容器 hostname 导致公网访问 502。
 
@@ -123,6 +123,8 @@ docker run --env-file .env.local -p 3000:3000 ghcr.io/yuxcoo/cms-for-hexo:latest
 当前选择的仓库保存在 HTTP-only cookie 中；如果环境变量里预设了 `GITHUB_OWNER` 和 `GITHUB_REPO`，则会作为默认仓库。
 
 新建仓库会通过 GitHub Actions 自动安装 Hexo 依赖、构建静态文件，并发布到 GitHub Pages。创建后需要在 GitHub 仓库 Settings → Pages 中确认 Source 使用 GitHub Actions。
+
+如果“立即发布”提示找不到 workflow，可以在“仓库”页点击“补全当前仓库”，或手动在博客仓库中添加 `.github/workflows/pages.yml`。GitHub token 需要有 Actions 读写权限。
 
 ## 站点配置
 
