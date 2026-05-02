@@ -79,6 +79,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -92,7 +95,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
       - name: Install dependencies
         run: |
           node --version
@@ -190,6 +193,8 @@ npm run build
 ## Publish
 
 GitHub Actions builds the site and publishes it to GitHub Pages.
+
+After the first successful publish, open this repository's Settings -> Pages and set Source to \`Deploy from a branch\`, Branch to \`gh-pages\`, and Folder to \`/ (root)\`. This one-time setting is required because the default GitHub Actions token can push the \`gh-pages\` branch but cannot reliably switch the Pages source for a new repository.
 
 Expected site URL: ${getSiteUrl(context)}
 `;
