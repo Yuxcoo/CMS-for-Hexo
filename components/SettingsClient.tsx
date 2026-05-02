@@ -95,15 +95,23 @@ export function SettingsClient() {
     loadTheme();
   }, []);
 
+  const tabs: Array<{ value: typeof mode; label: string }> = [
+    { value: 'common', label: '常用字段' },
+    { value: 'yaml', label: '完整 YAML' },
+    { value: 'theme', label: '主题 YAML' }
+  ];
+
   return (
-    <div className="grid gap-5">
-      <div className="inline-flex w-fit rounded-md border border-line bg-white p-1">
-        <button className={`rounded px-3 py-2 text-sm ${mode === 'common' ? 'bg-[#e7eee8] text-moss' : ''}`} onClick={() => setMode('common')}>常用字段</button>
-        <button className={`rounded px-3 py-2 text-sm ${mode === 'yaml' ? 'bg-[#e7eee8] text-moss' : ''}`} onClick={() => setMode('yaml')}>完整 YAML</button>
-        <button className={`rounded px-3 py-2 text-sm ${mode === 'theme' ? 'bg-[#e7eee8] text-moss' : ''}`} onClick={() => setMode('theme')}>主题 YAML</button>
+    <div className="grid gap-6">
+      <div className="inline-flex w-fit rounded-full border border-line bg-canvas p-1">
+        {tabs.map((tab) => (
+          <button key={tab.value} className={`rounded-full px-4 py-2 text-[14px] leading-[1.29] tracking-[-0.224px] transition active:scale-95 ${mode === tab.value ? 'bg-blue text-white' : 'text-muted hover:text-blue'}`} onClick={() => setMode(tab.value)}>
+            {tab.label}
+          </button>
+        ))}
       </div>
       {mode === 'common' ? (
-        <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+        <section className="apple-card">
           <div className="grid gap-4 md:grid-cols-2">
             {fields.map((key) => (
               <Field key={key} label={key}>
@@ -111,23 +119,23 @@ export function SettingsClient() {
               </Field>
             ))}
           </div>
-          <Button className="mt-4" onClick={saveCommon} disabled={busy}><Save size={17} />保存常用字段</Button>
+          <Button className="mt-6" onClick={saveCommon} disabled={busy}><Save size={17} />保存常用字段</Button>
         </section>
       ) : mode === 'yaml' ? (
-        <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-          <TextArea value={raw} onChange={(event) => setRaw(event.target.value)} className="min-h-[620px] font-mono" />
-          <Button className="mt-4" onClick={saveYaml} disabled={busy}><Save size={17} />保存 YAML</Button>
+        <section className="apple-card">
+          <TextArea value={raw} onChange={(event) => setRaw(event.target.value)} className="min-h-[620px] font-mono text-[15px] tracking-normal" />
+          <Button className="mt-6" onClick={saveYaml} disabled={busy}><Save size={17} />保存 YAML</Button>
         </section>
       ) : (
-        <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+        <section className="apple-card">
           <Field label="主题配置路径">
             <TextInput value={themePath} onChange={(event) => setThemePath(event.target.value)} placeholder="_config.theme.yml 或 themes/theme/_config.yml" />
           </Field>
-          <TextArea value={themeRaw} onChange={(event) => setThemeRaw(event.target.value)} className="mt-4 min-h-[620px] font-mono" />
-          <Button className="mt-4" onClick={saveTheme} disabled={busy || !themePath}><Save size={17} />保存主题 YAML</Button>
+          <TextArea value={themeRaw} onChange={(event) => setThemeRaw(event.target.value)} className="mt-4 min-h-[620px] font-mono text-[15px] tracking-normal" />
+          <Button className="mt-6" onClick={saveTheme} disabled={busy || !themePath}><Save size={17} />保存主题 YAML</Button>
         </section>
       )}
-      {message ? <p className="rounded-md bg-[#eef2ee] px-3 py-2 text-sm">{message}</p> : null}
+      {message ? <p className="apple-message break-all">{message}</p> : null}
     </div>
   );
 }

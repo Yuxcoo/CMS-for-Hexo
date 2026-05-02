@@ -30,23 +30,21 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-paper px-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-line bg-white p-6 shadow-panel">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-md bg-[#e7eee8] text-moss">
+    <main className="grid min-h-screen place-items-center bg-paper px-4 py-12">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-[18px] border border-line bg-canvas p-6">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 grid h-11 w-11 place-items-center rounded-full bg-paper text-blue">
             <Lock size={20} />
           </div>
-          <div>
-            <h1 className="text-xl font-bold">CMS for Hexo</h1>
-            <p className="text-sm text-[#68746c]">个人博客后台</p>
-          </div>
+          <h1 className="font-display text-[40px] font-semibold leading-[1.1] tracking-[-0.28px] text-ink">CMS for Hexo</h1>
+          <p className="mt-2 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">个人博客后台</p>
         </div>
-        <label className="grid gap-2 text-sm font-medium">
+        <label className="grid gap-2 text-sm font-semibold leading-[1.29] tracking-[-0.224px] text-ink">
           管理员密码
-          <input className="min-h-11 rounded-md border border-line px-3 outline-none focus:border-moss" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
+          <input className="min-h-11 rounded-full border border-line bg-canvas px-5 py-3 text-[17px] leading-[1.47] tracking-[-0.374px] outline-none transition focus:border-blueFocus focus:ring-2 focus:ring-blueFocus/20" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
         </label>
-        {error ? <p className="mt-3 text-sm text-coral">{error}</p> : null}
-        <Button className="mt-5 w-full" disabled={loading}>{loading ? '登录中...' : '登录'}</Button>
+        {error ? <p className="mt-3 text-[14px] leading-[1.29] tracking-[-0.224px] text-danger">{error}</p> : null}
+        <Button className="mt-6 w-full" disabled={loading}>{loading ? '登录中...' : '登录'}</Button>
       </form>
     </main>
   );

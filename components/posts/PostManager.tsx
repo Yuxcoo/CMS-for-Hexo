@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PostEditor, PostList } from './PostEditor';
 import type { PostContent, PostKind, PostSummary } from '@/types/post';
 
@@ -10,13 +10,13 @@ export function PostManager({ kind }: { kind: PostKind }) {
   const [loading, setLoading] = useState(true);
   const endpoint = kind === 'post' ? '/api/posts' : '/api/drafts';
 
-  async function loadList() {
+  const loadList = useCallback(async () => {
     setLoading(true);
     const response = await fetch(endpoint);
     const result = await response.json();
     setItems(kind === 'post' ? result.posts || [] : result.drafts || []);
     setLoading(false);
-  }
+  }, [endpoint, kind]);
 
   async function select(post: PostSummary) {
     const contentEndpoint = kind === 'post' ? `/api/posts/content?path=${encodeURIComponent(post.path)}` : `/api/drafts?path=${encodeURIComponent(post.path)}`;
@@ -27,12 +27,12 @@ export function PostManager({ kind }: { kind: PostKind }) {
 
   useEffect(() => {
     loadList();
-  }, []);
+  }, [loadList]);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
+    <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
       <div>
-        {loading ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-[#68746c]">加载中...</div> : <PostList posts={items} activePath={active?.path} onSelect={select} />}
+        {loading ? <div className="apple-message">加载中...</div> : <PostList posts={items} activePath={active?.path} onSelect={select} />}
       </div>
       <PostEditor kind={kind} initial={active} onSaved={loadList} onDeleted={() => { setActive(undefined); loadList(); }} />
     </div>

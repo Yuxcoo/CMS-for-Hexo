@@ -121,8 +121,12 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
-      <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+    <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      <section className="apple-card">
+        <div className="mb-6">
+          <h2 className="font-display text-[28px] font-semibold leading-[1.14] tracking-[-0.28px] text-ink">内容信息</h2>
+          <p className="mt-2 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">Front matter 与仓库路径会随正文一起提交。</p>
+        </div>
         <div className="grid gap-4">
           <Field label="标题">
             <TextInput value={meta.title} onChange={(event) => updateMeta('title', event.target.value)} placeholder="我的新文章" />
@@ -142,19 +146,19 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
           <Field label="摘要">
             <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} />
           </Field>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             <Button onClick={() => save()} disabled={busy}><Save size={17} />{busy ? '保存中...' : '保存'}</Button>
             {kind === 'post' && !path ? <Button variant="secondary" onClick={() => save('draft')} disabled={busy}><FilePenLine size={17} />保存至草稿</Button> : null}
             {kind === 'draft' && path ? <Button variant="secondary" onClick={publishDraft} disabled={busy}><UploadCloud size={17} />发布</Button> : null}
             {kind === 'post' && path ? <Button variant="secondary" onClick={moveToDraft} disabled={busy}><UploadCloud size={17} />转草稿</Button> : null}
             {path ? <Button variant="danger" onClick={remove} disabled={busy}><Trash2 size={17} />删除</Button> : null}
           </div>
-          {message ? <p className="rounded-md bg-[#eef2ee] px-3 py-2 text-sm text-ink">{message}</p> : null}
+          {message ? <p className="apple-message break-all">{message}</p> : null}
         </div>
       </section>
       <section className="grid min-h-[680px] gap-4 lg:grid-cols-2">
-        <TextArea value={body} onChange={(event) => setBody(event.target.value)} className="min-h-[680px] font-mono" placeholder="在这里写 Markdown..." />
-        <article className="prose-preview min-h-[680px] overflow-auto rounded-lg border border-line bg-white p-5 shadow-panel" dangerouslySetInnerHTML={{ __html: preview }} />
+        <TextArea value={body} onChange={(event) => setBody(event.target.value)} className="min-h-[680px] rounded-[18px] font-mono text-[15px] tracking-normal" placeholder="在这里写 Markdown..." />
+        <article className="prose-preview min-h-[680px] overflow-auto rounded-[18px] border border-line bg-canvas p-6" dangerouslySetInnerHTML={{ __html: preview }} />
       </section>
     </div>
   );
@@ -164,15 +168,15 @@ export function PostList({ posts, activePath, onSelect }: { posts: PostSummary[]
   const [query, setQuery] = useState('');
   const filtered = posts.filter((post) => `${post.meta.title} ${post.path} ${post.meta.tags.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
   return (
-    <aside className="rounded-lg border border-line bg-white shadow-panel">
-      <div className="border-b border-line p-3">
+    <aside className="apple-panel overflow-hidden">
+      <div className="border-b border-line p-4">
         <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、路径、标签" />
       </div>
-      <div className="max-h-[720px] overflow-auto p-2">
+      <div className="max-h-[720px] overflow-auto p-3">
         {filtered.map((post) => (
-          <button key={post.path} onClick={() => onSelect(post)} className={`mb-2 block w-full rounded-md p-3 text-left text-sm hover:bg-[#f1f4f1] ${activePath === post.path ? 'bg-[#e7eee8]' : ''}`}>
-            <div className="font-semibold">{post.meta.title}</div>
-            <div className="mt-1 truncate text-xs text-[#68746c]">{post.path}</div>
+          <button key={post.path} onClick={() => onSelect(post)} className={`mb-2 block w-full rounded-[11px] border p-4 text-left transition hover:border-blue ${activePath === post.path ? 'border-blue bg-paper' : 'border-transparent hover:bg-paper'}`}>
+            <div className="text-[17px] font-semibold leading-[1.24] tracking-[-0.374px] text-ink">{post.meta.title}</div>
+            <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{post.path}</div>
           </button>
         ))}
       </div>

@@ -116,9 +116,9 @@ export function RepositoryClient() {
   const filtered = repos.filter((repo) => repo.fullName.toLowerCase().includes(query.toLowerCase()));
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-      <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
-        <h2 className="mb-4 text-lg font-bold">新建博客仓库</h2>
+    <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+      <section className="apple-card">
+        <h2 className="mb-5 font-display text-[34px] font-semibold leading-[1.2] tracking-[-0.374px] text-ink">新建博客仓库</h2>
         <div className="grid gap-4">
           <Field label="仓库名">
             <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="username.github.io" />
@@ -126,37 +126,39 @@ export function RepositoryClient() {
           <Field label="描述">
             <TextInput value={description} onChange={(event) => setDescription(event.target.value)} />
           </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /> 私有仓库
+          <label className="flex min-h-11 items-center gap-3 text-[17px] leading-[1.47] tracking-[-0.374px] text-ink">
+            <input className="h-5 w-5 accent-blue" type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /> 私有仓库
           </label>
-          <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />{busy ? '处理中...' : '创建可发布博客'}</Button>
-          <Button variant="secondary" onClick={initializeCurrent} disabled={busy}><Wand2 size={17} />补全当前仓库</Button>
-          {message ? <p className="break-all rounded-md bg-[#eef2ee] px-3 py-2 text-sm">{message}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />{busy ? '处理中...' : '创建可发布博客'}</Button>
+            <Button variant="secondary" onClick={initializeCurrent} disabled={busy}><Wand2 size={17} />补全当前仓库</Button>
+          </div>
+          {message ? <p className="apple-message break-all">{message}</p> : null}
         </div>
       </section>
-      <section className="rounded-lg border border-line bg-white shadow-panel">
-        <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="apple-panel overflow-hidden">
+        <div className="flex flex-col gap-4 border-b border-line p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-bold">连接已有仓库</h2>
-            <p className="text-sm text-[#68746c]">显示 token 可访问的 GitHub 仓库。</p>
+            <h2 className="font-display text-[34px] font-semibold leading-[1.2] tracking-[-0.374px] text-ink">连接已有仓库</h2>
+            <p className="mt-1 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">显示 token 可访问的 GitHub 仓库。</p>
           </div>
           <Button variant="secondary" onClick={load} disabled={busy}><RefreshCw size={17} />刷新</Button>
         </div>
-        <div className="border-b border-line p-4">
+        <div className="border-b border-line p-5">
           <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索 owner/repo" />
         </div>
-        <div className="max-h-[720px] overflow-auto p-3">
-          {!busy && !filtered.length ? <p className="rounded-md bg-[#f4f6f4] px-3 py-2 text-sm text-[#68746c]">没有找到匹配的仓库。</p> : null}
+        <div className="max-h-[720px] overflow-auto p-4">
+          {!busy && !filtered.length ? <p className="apple-message text-muted">没有找到匹配的仓库。</p> : null}
           {filtered.map((repo) => (
-            <article key={repo.fullName} className="mb-3 flex flex-col gap-3 rounded-md border border-line p-3 sm:flex-row sm:items-center sm:justify-between">
+            <article key={repo.fullName} className="mb-3 flex flex-col gap-4 rounded-[11px] border border-line p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="font-semibold">{repo.fullName}</div>
-                <div className="mt-1 flex flex-wrap gap-3 text-xs text-[#68746c]">
+                <div className="text-[17px] font-semibold leading-[1.24] tracking-[-0.374px] text-ink">{repo.fullName}</div>
+                <div className="mt-2 flex flex-wrap gap-3 text-[12px] leading-none tracking-[-0.12px] text-muted">
                   <span>{repo.private ? 'private' : 'public'}</span>
                   <span className="inline-flex items-center gap-1"><GitBranch size={13} />{repo.defaultBranch}</span>
                 </div>
               </div>
-              <Button variant="secondary" onClick={() => selectRepo(repo)} disabled={busy}><Check size={17} />{busy ? '请稍候' : '连接'}</Button>
+              <Button variant="secondary" className="min-h-10 px-4 py-2 text-[14px]" onClick={() => selectRepo(repo)} disabled={busy}><Check size={17} />{busy ? '请稍候' : '连接'}</Button>
             </article>
           ))}
         </div>

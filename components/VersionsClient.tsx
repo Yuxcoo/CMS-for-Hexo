@@ -7,13 +7,14 @@ import type { DependencyVersion, VersionReport } from '@/types/version';
 
 function VersionRow({ item }: { item: DependencyVersion }) {
   const state = item.updateHint === 'maybe-outdated' ? '可能可更新' : item.updateHint === 'ok' ? '最新' : '未知';
+  const stateClass = item.updateHint === 'ok' ? 'text-success' : item.updateHint === 'maybe-outdated' ? 'text-blue' : 'text-muted';
   return (
     <tr className="border-t border-line">
-      <td className="px-3 py-3 font-medium">{item.name}</td>
-      <td className="px-3 py-3">{item.current}</td>
-      <td className="px-3 py-3">{item.latest || '-'}</td>
-      <td className="px-3 py-3">{item.source}</td>
-      <td className="px-3 py-3">{state}</td>
+      <td className="px-4 py-4 font-semibold text-ink">{item.name}</td>
+      <td className="px-4 py-4 text-muted">{item.current}</td>
+      <td className="px-4 py-4 text-muted">{item.latest || '-'}</td>
+      <td className="px-4 py-4 text-muted">{item.source}</td>
+      <td className={`px-4 py-4 font-semibold ${stateClass}`}>{state}</td>
     </tr>
   );
 }
@@ -35,32 +36,34 @@ export function VersionsClient() {
   }, []);
 
   return (
-    <div className="grid gap-5">
-      <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+    <div className="grid gap-6">
+      <section className="apple-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm text-[#68746c]">包管理器</div>
-            <div className="text-xl font-bold">{report?.packageManager || '未检测到锁文件'}</div>
+            <div className="text-[14px] leading-[1.29] tracking-[-0.224px] text-muted">包管理器</div>
+            <div className="mt-1 font-display text-[34px] font-semibold leading-[1.2] tracking-[-0.374px] text-ink">{report?.packageManager || '未检测到锁文件'}</div>
           </div>
           <Button variant="secondary" onClick={load} disabled={loading}><RefreshCw size={17} />刷新</Button>
         </div>
-        {report?.note ? <p className="mt-3 text-sm text-[#68746c]">{report.note}</p> : null}
+        {report?.note ? <p className="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">{report.note}</p> : null}
       </section>
-      <section className="overflow-auto rounded-lg border border-line bg-white shadow-panel">
-        <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-          <thead className="bg-[#eef2ee]">
-            <tr>
-              <th className="px-3 py-3">依赖</th>
-              <th className="px-3 py-3">当前</th>
-              <th className="px-3 py-3">最新</th>
-              <th className="px-3 py-3">来源</th>
-              <th className="px-3 py-3">状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report?.all.map((item) => <VersionRow key={`${item.name}-${item.source}`} item={item} />)}
-          </tbody>
-        </table>
+      <section className="overflow-hidden rounded-[18px] border border-line bg-canvas">
+        <div className="overflow-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left text-[14px] leading-[1.29] tracking-[-0.224px]">
+            <thead className="bg-paper text-ink">
+              <tr>
+                <th className="px-4 py-4 font-semibold">依赖</th>
+                <th className="px-4 py-4 font-semibold">当前</th>
+                <th className="px-4 py-4 font-semibold">最新</th>
+                <th className="px-4 py-4 font-semibold">来源</th>
+                <th className="px-4 py-4 font-semibold">状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report?.all.map((item) => <VersionRow key={`${item.name}-${item.source}`} item={item} />)}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
