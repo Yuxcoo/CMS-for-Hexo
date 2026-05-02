@@ -114,22 +114,8 @@ jobs:
           ls -la
           test -f package.json
           test -f _config.yml
-          node <<'NODE'
-          const Hexo = require('hexo');
-          const hexo = new Hexo(process.cwd(), { debug: true });
-          async function main() {
-            await hexo.init();
-            await hexo.load();
-            await hexo.call('clean');
-            await hexo.call('generate');
-            await hexo.exit();
-          }
-          main().catch(async (error) => {
-            console.error(error);
-            try { await hexo.exit(error); } catch {}
-            process.exit(1);
-          });
-          NODE
+          npm run clean
+          npm run build
           if [ ! -d public ]; then
             echo "Hexo generate finished without creating public. Repository root contents:"
             ls -la
