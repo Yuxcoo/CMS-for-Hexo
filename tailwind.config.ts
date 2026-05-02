@@ -5,22 +5,22 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: '#1d1d1f',
-        paper: '#f5f5f7',
-        canvas: '#ffffff',
-        pearl: '#fafafc',
-        line: '#e0e0e0',
-        soft: '#f0f0f0',
-        blue: '#0066cc',
-        blueFocus: '#0071e3',
-        blueDark: '#2997ff',
-        tile: '#272729',
-        tile2: '#2a2a2c',
-        tile3: '#252527',
-        muted: '#7a7a7a',
-        darkMuted: '#cccccc',
-        success: '#0a7f3f',
-        danger: '#b42318'
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        paper: 'rgb(var(--color-paper) / <alpha-value>)',
+        canvas: 'rgb(var(--color-canvas) / <alpha-value>)',
+        pearl: 'rgb(var(--color-pearl) / <alpha-value>)',
+        line: 'rgb(var(--color-line) / <alpha-value>)',
+        soft: 'rgb(var(--color-soft) / <alpha-value>)',
+        blue: 'rgb(var(--color-blue) / <alpha-value>)',
+        blueFocus: 'rgb(var(--color-blue-focus) / <alpha-value>)',
+        blueDark: 'rgb(var(--color-blue-dark) / <alpha-value>)',
+        tile: 'rgb(var(--color-tile) / <alpha-value>)',
+        tile2: 'rgb(var(--color-tile-2) / <alpha-value>)',
+        tile3: 'rgb(var(--color-tile-3) / <alpha-value>)',
+        muted: 'rgb(var(--color-muted) / <alpha-value>)',
+        darkMuted: 'rgb(var(--color-dark-muted) / <alpha-value>)',
+        success: 'rgb(var(--color-success) / <alpha-value>)',
+        danger: 'rgb(var(--color-danger) / <alpha-value>)'
       },
       boxShadow: {
         panel: 'none',

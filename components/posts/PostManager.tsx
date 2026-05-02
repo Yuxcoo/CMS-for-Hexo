@@ -30,7 +30,7 @@ export function PostManager({ kind }: { kind: PostKind }) {
   }, [loadList]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
       <div>
         {loading ? <div className="apple-message">加载中...</div> : <PostList posts={items} activePath={active?.path} onSelect={select} />}
       </div>

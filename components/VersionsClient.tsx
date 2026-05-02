@@ -10,11 +10,11 @@ function VersionRow({ item }: { item: DependencyVersion }) {
   const stateClass = item.updateHint === 'ok' ? 'text-success' : item.updateHint === 'maybe-outdated' ? 'text-blue' : 'text-muted';
   return (
     <tr className="border-t border-line">
-      <td className="px-4 py-4 font-semibold text-ink">{item.name}</td>
-      <td className="px-4 py-4 text-muted">{item.current}</td>
-      <td className="px-4 py-4 text-muted">{item.latest || '-'}</td>
-      <td className="px-4 py-4 text-muted">{item.source}</td>
-      <td className={`px-4 py-4 font-semibold ${stateClass}`}>{state}</td>
+      <td className="px-3 py-3 font-semibold text-ink">{item.name}</td>
+      <td className="px-3 py-3 text-muted">{item.current}</td>
+      <td className="px-3 py-3 text-muted">{item.latest || '-'}</td>
+      <td className="px-3 py-3 text-muted">{item.source}</td>
+      <td className={`px-3 py-3 font-semibold ${stateClass}`}>{state}</td>
     </tr>
   );
 }
@@ -36,27 +36,27 @@ export function VersionsClient() {
   }, []);
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-4">
       <section className="apple-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[14px] leading-[1.29] tracking-[-0.224px] text-muted">包管理器</div>
-            <div className="mt-1 font-display text-[34px] font-semibold leading-[1.2] tracking-[-0.374px] text-ink">{report?.packageManager || '未检测到锁文件'}</div>
+            <div className="mt-1 font-display text-[26px] font-semibold leading-[1.2] tracking-[-0.18px] text-ink">{report?.packageManager || '未检测到锁文件'}</div>
           </div>
           <Button variant="secondary" onClick={load} disabled={loading}><RefreshCw size={17} />刷新</Button>
         </div>
-        {report?.note ? <p className="mt-4 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">{report.note}</p> : null}
+        {report?.note ? <p className="mt-4 text-[15px] leading-[1.45] tracking-[-0.18px] text-muted">{report.note}</p> : null}
       </section>
-      <section className="overflow-hidden rounded-[18px] border border-line bg-canvas">
+      <section className="overflow-hidden rounded-[14px] border border-line bg-canvas">
         <div className="overflow-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-[14px] leading-[1.29] tracking-[-0.224px]">
             <thead className="bg-paper text-ink">
               <tr>
-                <th className="px-4 py-4 font-semibold">依赖</th>
-                <th className="px-4 py-4 font-semibold">当前</th>
-                <th className="px-4 py-4 font-semibold">最新</th>
-                <th className="px-4 py-4 font-semibold">来源</th>
-                <th className="px-4 py-4 font-semibold">状态</th>
+                <th className="px-3 py-3 font-semibold">依赖</th>
+                <th className="px-3 py-3 font-semibold">当前</th>
+                <th className="px-3 py-3 font-semibold">最新</th>
+                <th className="px-3 py-3 font-semibold">来源</th>
+                <th className="px-3 py-3 font-semibold">状态</th>
               </tr>
             </thead>
             <tbody>

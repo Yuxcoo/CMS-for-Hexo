@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { FileText, Gauge, Github, Image, LogOut, Menu, PanelTop, Rocket, ScrollText, Search, Settings2, SlidersHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Activity, ExternalLink, FileText, Gauge, Github, Image, LogOut, Menu, PanelTop, Rocket, ScrollText, Settings2, SlidersHorizontal } from 'lucide-react';
+import { GlobalSearch } from '@/components/layout/GlobalSearch';
+import { ThemeModeControl } from '@/components/layout/ThemeModeControl';
 
 const nav = [
   { href: '/dashboard', label: '仪表盘', icon: Gauge },
@@ -35,65 +36,65 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-paper text-ink">
       <header className="sticky top-0 z-40">
-        <div className="h-11 bg-black text-white">
-          <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
-            <Link href="/dashboard" className="font-display text-[12px] font-semibold leading-none tracking-[-0.12px]">
-              CMS for Hexo
-            </Link>
-            <nav className="hidden items-center gap-5 lg:flex">
-              {nav.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                return (
-                  <Link key={item.href} href={item.href} className={`text-[12px] font-normal leading-none tracking-[-0.12px] transition ${active ? 'text-white' : 'text-white/72 hover:text-white'}`}>
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="flex items-center gap-3 text-white/80">
-              <Search size={15} className="hidden sm:block" />
-              <button type="button" onClick={logout} className="hidden min-h-8 items-center gap-2 rounded-lg bg-ink px-3 text-[14px] leading-none tracking-[-0.224px] text-white transition active:scale-95 sm:inline-flex">
+        <div className="h-10 bg-black text-white">
+          <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between px-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-5">
+              <Link href="/dashboard" className="font-display text-[13px] font-semibold leading-none tracking-[-0.12px]">
+                CMS for Hexo
+              </Link>
+              <Link href="/repository" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] text-white/72 transition hover:text-white md:inline-flex">
+                <Github size={14} /> 仓库
+              </Link>
+              <Link href="/versions" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] text-white/72 transition hover:text-white md:inline-flex">
+                <Activity size={14} /> 健康检查
+              </Link>
+            </div>
+            <div className="flex items-center gap-3 text-white/78">
+              <Link href="/settings" className="hidden text-[12px] leading-none tracking-[-0.12px] transition hover:text-white sm:inline-flex">站点配置</Link>
+              <a href="/" target="_blank" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] transition hover:text-white md:inline-flex">
+                <ExternalLink size={14} /> 预览站点
+              </a>
+              <GlobalSearch />
+              <ThemeModeControl />
+              <button type="button" onClick={logout} className="hidden min-h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[13px] leading-none tracking-[-0.12px] text-white transition active:scale-95 sm:inline-flex">
                 <LogOut size={15} /> 登出
               </button>
               <Menu size={19} className="lg:hidden" />
             </div>
           </div>
         </div>
-        <div className="border-b border-black/10 bg-paper/80 backdrop-blur-xl backdrop-saturate-150">
-          <div className="mx-auto flex h-[52px] max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="border-b border-black/10 bg-paper/86 backdrop-blur-xl backdrop-saturate-150">
+          <div className="mx-auto flex min-h-[48px] max-w-[1280px] items-center justify-between gap-4 px-4 py-1.5 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
-              <CurrentIcon className="shrink-0 text-ink" size={20} />
-              <span className="truncate font-display text-[21px] font-semibold leading-[1.19] tracking-[0.231px] text-ink">{current.label}</span>
+              <CurrentIcon className="shrink-0 text-ink" size={18} />
+              <span className="truncate font-display text-[18px] font-semibold leading-[1.2] tracking-[-0.18px] text-ink">{current.label}</span>
             </div>
-            <div className="hidden min-w-0 items-center gap-4 overflow-x-auto md:flex">
-              {nav.slice(0, 6).map((item) => {
+            <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto lg:flex">
+              {nav.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
-                  <Link key={item.href} href={item.href} className={`whitespace-nowrap text-[14px] leading-[1.29] tracking-[-0.224px] ${active ? 'text-ink' : 'text-muted hover:text-blue'}`}>
+                  <Link key={item.href} href={item.href} className={`whitespace-nowrap rounded-full px-3 py-2 text-[13px] leading-none tracking-[-0.12px] transition ${active ? 'bg-canvas text-ink ring-1 ring-line' : 'text-muted hover:bg-canvas hover:text-blue'}`}>
                     {item.label}
                   </Link>
                 );
               })}
-              <Link href="/posts/new" className="rounded-full bg-blue px-[18px] py-2 text-[14px] leading-[1.29] tracking-[-0.224px] text-white transition hover:bg-blueFocus active:scale-95">
-                新建
-              </Link>
-            </div>
-            <Link href="/posts/new" className="rounded-full bg-blue px-4 py-2 text-[14px] leading-[1.29] tracking-[-0.224px] text-white transition active:scale-95 md:hidden">
-              新建
+            </nav>
+            <Link href="/posts/new" className="rounded-full bg-blue px-4 py-2 text-[13px] leading-none tracking-[-0.12px] text-white transition hover:bg-blueFocus active:scale-95">
+              新建文章
             </Link>
           </div>
         </div>
       </header>
       <main>
-        <div className="mx-auto max-w-[1440px] px-4 py-10 pb-24 sm:px-6 lg:px-8">{children}</div>
+        <div className="mx-auto max-w-[1280px] px-4 py-7 pb-20 sm:px-6 lg:px-8">{children}</div>
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-black/10 bg-paper/90 backdrop-blur-xl lg:hidden">
         {nav.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <Link key={item.href} href={item.href} className={`grid min-h-16 min-w-20 place-items-center gap-1 px-2 text-[12px] leading-none tracking-[-0.12px] ${active ? 'text-blue' : 'text-muted'}`}>
-              <Icon size={19} />
+            <Link key={item.href} href={item.href} className={`grid min-h-14 min-w-16 place-items-center gap-1 px-2 text-[11px] leading-none tracking-[-0.08px] ${active ? 'text-blue' : 'text-muted'}`}>
+              <Icon size={17} />
               <span>{item.label}</span>
             </Link>
           );

@@ -26,33 +26,33 @@ export function DashboardClient() {
   const repoName = health?.currentRepository ? `${health.currentRepository.owner}/${health.currentRepository.repo}` : health?.config?.repo || '未选择仓库';
 
   return (
-    <div className="grid gap-6">
-      <section className="overflow-hidden rounded-none bg-tile text-white">
-        <div className="mx-auto grid min-h-[360px] max-w-5xl content-center gap-8 px-6 py-20 text-center sm:px-10">
-          <div>
-            <div className="text-[21px] font-semibold leading-[1.19] tracking-[0.231px] text-darkMuted">当前仓库</div>
-            <h2 className="mt-3 font-display text-[40px] font-semibold leading-[1.1] tracking-[-0.28px] sm:text-[56px] sm:leading-[1.07]">{repoName}</h2>
+    <div className="grid gap-4">
+      <section className="rounded-[14px] border border-line bg-canvas p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold leading-none tracking-[-0.12px] text-muted">当前仓库</div>
+            <h2 className="mt-2 truncate font-display text-[28px] font-semibold leading-[1.12] tracking-[-0.24px] text-ink sm:text-[32px]">{repoName}</h2>
+            {health?.config && !health.config.ok ? <p className="mt-2 text-[14px] leading-[1.4] text-danger">{health.config.error}</p> : null}
           </div>
-          <div className="grid gap-3 text-[17px] leading-[1.47] tracking-[-0.374px] text-darkMuted sm:grid-cols-2 lg:grid-cols-4">
-            <span>分支：{health?.config?.branch || '-'}</span>
-            <span>文章：{health?.config?.postsDir || '-'}</span>
-            <span>草稿：{health?.config?.draftsDir || '-'}</span>
-            <span>图片：{health?.config?.imagesDir || '-'}</span>
+          <div className="grid gap-2 text-[14px] leading-[1.35] tracking-[-0.12px] text-muted sm:grid-cols-2 lg:min-w-[540px] lg:grid-cols-4">
+            <span className="rounded-[10px] bg-paper px-3 py-2">分支：{health?.config?.branch || '-'}</span>
+            <span className="rounded-[10px] bg-paper px-3 py-2">文章：{health?.config?.postsDir || '-'}</span>
+            <span className="rounded-[10px] bg-paper px-3 py-2">草稿：{health?.config?.draftsDir || '-'}</span>
+            <span className="rounded-[10px] bg-paper px-3 py-2">图片：{health?.config?.imagesDir || '-'}</span>
           </div>
-          {health?.config && !health.config.ok ? <p className="text-[17px] text-blueDark">{health.config.error}</p> : null}
         </div>
       </section>
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <Link key={card.href} href={card.href} className="group rounded-[18px] border border-line bg-canvas p-6 transition hover:border-blue">
-              <div className="mb-6 grid h-11 w-11 place-items-center rounded-full bg-paper text-blue transition group-active:scale-95">
-                <Icon size={22} />
+            <Link key={card.href} href={card.href} className="group rounded-[14px] border border-line bg-canvas p-5 transition hover:border-blue">
+              <div className="mb-4 grid h-9 w-9 place-items-center rounded-full bg-paper text-blue transition group-active:scale-95">
+                <Icon size={19} />
               </div>
-              <h2 className="font-display text-[28px] font-semibold leading-[1.14] tracking-[-0.28px] text-ink">{card.title}</h2>
-              <p className="mt-2 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">{card.desc}</p>
-              <span className="mt-5 inline-flex text-[17px] leading-[1.47] tracking-[-0.374px] text-blue">打开</span>
+              <h2 className="font-display text-[22px] font-semibold leading-[1.18] tracking-[-0.2px] text-ink">{card.title}</h2>
+              <p className="mt-1.5 text-[15px] leading-[1.45] tracking-[-0.18px] text-muted">{card.desc}</p>
+              <span className="mt-4 inline-flex text-[15px] leading-[1.45] tracking-[-0.18px] text-blue">打开</span>
             </Link>
           );
         })}

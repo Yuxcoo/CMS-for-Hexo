@@ -87,17 +87,17 @@ export function PagesClient() {
   }, []);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
       <aside className="apple-panel overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-line p-4">
-          <h2 className="font-display text-[28px] font-semibold leading-[1.14] tracking-[-0.28px] text-ink">页面</h2>
+          <h2 className="font-display text-[22px] font-semibold leading-[1.14] tracking-[-0.2px] text-ink">页面</h2>
           <Button variant="secondary" className="min-h-10 px-4 py-2 text-[14px]" onClick={createNew} disabled={busy}><Plus size={17} />新增</Button>
         </div>
-        <div className="max-h-[720px] overflow-auto p-3">
+        <div className="max-h-[620px] overflow-auto p-3">
           {!pages.length ? <p className="apple-message text-muted">还没有独立页面。</p> : null}
           {pages.map((page) => (
             <button key={page.path} onClick={() => select(page)} className={`mb-2 block w-full rounded-[11px] border p-4 text-left transition hover:border-blue ${active.path === page.path ? 'border-blue bg-paper' : 'border-transparent hover:bg-paper'}`}>
-              <div className="text-[17px] font-semibold leading-[1.24] tracking-[-0.374px] text-ink">{page.title}</div>
+              <div className="text-[15px] font-semibold leading-[1.24] tracking-[-0.18px] text-ink">{page.title}</div>
               <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{page.url}</div>
             </button>
           ))}
@@ -113,7 +113,7 @@ export function PagesClient() {
           </Field>
         </div>
         <Field label="页面正文 Markdown">
-          <TextArea value={active.body} onChange={(event) => setActive((current) => ({ ...current, body: event.target.value }))} className="min-h-[520px] font-mono text-[15px] tracking-normal" placeholder="写一些页面内容..." />
+          <TextArea value={active.body} onChange={(event) => setActive((current) => ({ ...current, body: event.target.value }))} className="min-h-[420px] font-mono text-[15px] tracking-normal" placeholder="写一些页面内容..." />
         </Field>
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={save} disabled={busy || !active.title.trim()}><Save size={17} />{busy ? '保存中...' : '保存页面并更新导航'}</Button>

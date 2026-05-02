@@ -10,6 +10,7 @@ export type PostMeta = {
   categories: string[];
   excerpt?: string;
   cover?: string;
+  permalink?: string;
   sticky?: number | boolean;
   [key: string]: FrontMatterValue;
 };

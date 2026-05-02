@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FilePenLine, Save, Trash2, UploadCloud } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePenLine, Save, Trash2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextArea, TextInput } from '@/components/ui/Field';
 import { renderMarkdownPreview } from '@/lib/markdown-preview';
@@ -18,7 +18,8 @@ const emptyMeta: PostMeta = {
   title: '',
   date: new Date().toISOString(),
   tags: [],
-  categories: []
+  categories: [],
+  permalink: ''
 };
 
 function arrayToText(value: string[]) {
@@ -29,6 +30,12 @@ function textToArray(value: string) {
   return value.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
+function cleanMeta(meta: PostMeta): PostMeta {
+  const next = { ...meta };
+  if (!String(next.permalink || '').trim()) delete next.permalink;
+  return next;
+}
+
 export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   const [meta, setMeta] = useState<PostMeta>(initial?.meta || emptyMeta);
   const [body, setBody] = useState(initial?.body || '');
@@ -36,11 +43,12 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   const [sha, setSha] = useState(initial?.sha || '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [showMeta, setShowMeta] = useState(true);
   const preview = useMemo(() => renderMarkdownPreview(body || ''), [body]);
 
   useEffect(() => {
     if (!initial) return;
-    setMeta(initial.meta);
+    setMeta({ ...initial.meta, permalink: String(initial.meta.permalink || '') });
     setBody(initial.body);
     setPath(initial.path);
     setSha(initial.sha);
@@ -61,7 +69,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind: targetKind, meta, body, path: targetKind === kind ? path || undefined : undefined, originalPath: targetKind === kind ? initial?.path : undefined, sha: targetKind === kind ? sha || undefined : undefined })
+      body: JSON.stringify({ kind: targetKind, meta: cleanMeta(meta), body, path: targetKind === kind ? path || undefined : undefined, originalPath: targetKind === kind ? initial?.path : undefined, sha: targetKind === kind ? sha || undefined : undefined })
     });
     const result = await response.json();
     setBusy(false);
@@ -121,44 +129,58 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-      <section className="apple-card">
-        <div className="mb-6">
-          <h2 className="font-display text-[28px] font-semibold leading-[1.14] tracking-[-0.28px] text-ink">内容信息</h2>
-          <p className="mt-2 text-[17px] leading-[1.47] tracking-[-0.374px] text-muted">Front matter 与仓库路径会随正文一起提交。</p>
-        </div>
-        <div className="grid gap-4">
-          <Field label="标题">
-            <TextInput value={meta.title} onChange={(event) => updateMeta('title', event.target.value)} placeholder="我的新文章" />
-          </Field>
-          <Field label="仓库路径">
-            <TextInput value={path} onChange={(event) => setPath(event.target.value)} placeholder={kind === 'post' ? 'source/_posts/my-post.md' : 'source/_drafts/my-draft.md'} />
-          </Field>
-          <Field label="发布日期">
-            <TextInput value={meta.date || ''} onChange={(event) => updateMeta('date', event.target.value)} placeholder="2026-05-01T10:00:00.000Z" />
-          </Field>
-          <Field label="标签，逗号分隔">
-            <TextInput value={arrayToText(meta.tags)} onChange={(event) => updateMeta('tags', textToArray(event.target.value))} />
-          </Field>
-          <Field label="分类，逗号分隔">
-            <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} />
-          </Field>
-          <Field label="摘要">
-            <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} />
-          </Field>
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button onClick={() => save()} disabled={busy}><Save size={17} />{busy ? '保存中...' : '保存'}</Button>
-            {kind === 'post' && !path ? <Button variant="secondary" onClick={() => save('draft')} disabled={busy}><FilePenLine size={17} />保存至草稿</Button> : null}
-            {kind === 'draft' && path ? <Button variant="secondary" onClick={publishDraft} disabled={busy}><UploadCloud size={17} />发布</Button> : null}
-            {kind === 'post' && path ? <Button variant="secondary" onClick={moveToDraft} disabled={busy}><UploadCloud size={17} />转草稿</Button> : null}
-            {path ? <Button variant="danger" onClick={remove} disabled={busy}><Trash2 size={17} />删除</Button> : null}
+    <div className="grid min-w-0 gap-4">
+      <section className="apple-panel overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-[22px] font-semibold leading-[1.18] tracking-[-0.2px] text-ink">{meta.title || '未命名文章'}</h2>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] leading-[1.3] tracking-[-0.12px] text-muted">
+              <span>仓库：{path || '自动生成'}</span>
+              <span>访问：{meta.permalink || '按 Hexo 默认规则'}</span>
+            </div>
           </div>
-          {message ? <p className="apple-message break-all">{message}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" onClick={() => setShowMeta((current) => !current)}>
+              {showMeta ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              信息
+            </Button>
+            <Button onClick={() => save()} disabled={busy}><Save size={16} />{busy ? '保存中...' : '保存'}</Button>
+            {kind === 'post' && !path ? <Button variant="secondary" onClick={() => save('draft')} disabled={busy}><FilePenLine size={16} />保存至草稿</Button> : null}
+            {kind === 'draft' && path ? <Button variant="secondary" onClick={publishDraft} disabled={busy}><UploadCloud size={16} />发布</Button> : null}
+            {kind === 'post' && path ? <Button variant="secondary" onClick={moveToDraft} disabled={busy}><UploadCloud size={16} />转草稿</Button> : null}
+            {path ? <Button variant="danger" onClick={remove} disabled={busy}><Trash2 size={16} />删除</Button> : null}
+          </div>
         </div>
+        {showMeta ? (
+          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="标题">
+              <TextInput value={meta.title} onChange={(event) => updateMeta('title', event.target.value)} placeholder="我的新文章" />
+            </Field>
+            <Field label="仓库路径">
+              <TextInput value={path} onChange={(event) => setPath(event.target.value)} placeholder={kind === 'post' ? 'source/_posts/my-post.md' : 'source/_drafts/my-draft.md'} />
+            </Field>
+            <Field label="Hexo 访问路径">
+              <TextInput value={String(meta.permalink || '')} onChange={(event) => updateMeta('permalink', event.target.value)} placeholder="posts/my-custom-url/" />
+            </Field>
+            <Field label="发布日期">
+              <TextInput value={meta.date || ''} onChange={(event) => updateMeta('date', event.target.value)} placeholder="2026-05-01T10:00:00.000Z" />
+            </Field>
+            <Field label="标签，逗号分隔">
+              <TextInput value={arrayToText(meta.tags)} onChange={(event) => updateMeta('tags', textToArray(event.target.value))} />
+            </Field>
+            <Field label="分类，逗号分隔">
+              <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} />
+            </Field>
+            <Field label="摘要">
+              <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-10 md:col-span-2" />
+            </Field>
+          </div>
+        ) : null}
+        {message ? <p className="mx-4 mb-4 apple-message break-all">{message}</p> : null}
       </section>
-      <section className="grid min-h-[680px] gap-4 lg:grid-cols-2">
-        <TextArea value={body} onChange={(event) => setBody(event.target.value)} className="min-h-[680px] rounded-[18px] font-mono text-[15px] tracking-normal" placeholder="在这里写 Markdown..." />
-        <article className="prose-preview min-h-[680px] overflow-auto rounded-[18px] border border-line bg-canvas p-6" dangerouslySetInnerHTML={{ __html: preview }} />
+      <section className="grid min-h-[620px] gap-4 xl:grid-cols-2">
+        <TextArea value={body} onChange={(event) => setBody(event.target.value)} className="min-h-[620px] rounded-[14px] font-mono text-[14px] tracking-normal" placeholder="在这里写 Markdown..." />
+        <article className="prose-preview min-h-[620px] overflow-auto rounded-[14px] border border-line bg-canvas p-4" dangerouslySetInnerHTML={{ __html: preview }} />
       </section>
     </div>
   );
@@ -166,17 +188,17 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
 
 export function PostList({ posts, activePath, onSelect }: { posts: PostSummary[]; activePath?: string; onSelect: (post: PostSummary) => void }) {
   const [query, setQuery] = useState('');
-  const filtered = posts.filter((post) => `${post.meta.title} ${post.path} ${post.meta.tags.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
+  const filtered = posts.filter((post) => `${post.meta.title} ${post.path} ${post.meta.permalink || ''} ${post.meta.tags.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
   return (
-    <aside className="apple-panel overflow-hidden">
-      <div className="border-b border-line p-4">
+    <aside className="apple-panel overflow-hidden xl:sticky xl:top-[104px]">
+      <div className="border-b border-line p-3">
         <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、路径、标签" />
       </div>
-      <div className="max-h-[720px] overflow-auto p-3">
+      <div className="max-h-[calc(100vh-190px)] overflow-auto p-2">
         {filtered.map((post) => (
-          <button key={post.path} onClick={() => onSelect(post)} className={`mb-2 block w-full rounded-[11px] border p-4 text-left transition hover:border-blue ${activePath === post.path ? 'border-blue bg-paper' : 'border-transparent hover:bg-paper'}`}>
-            <div className="text-[17px] font-semibold leading-[1.24] tracking-[-0.374px] text-ink">{post.meta.title}</div>
-            <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{post.path}</div>
+          <button key={post.path} onClick={() => onSelect(post)} className={`mb-2 block w-full rounded-[10px] border p-3 text-left transition hover:border-blue ${activePath === post.path ? 'border-blue bg-paper' : 'border-transparent hover:bg-paper'}`}>
+            <div className="text-[15px] font-semibold leading-[1.25] tracking-[-0.18px] text-ink">{post.meta.title}</div>
+            <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{post.meta.permalink || post.path}</div>
           </button>
         ))}
       </div>
