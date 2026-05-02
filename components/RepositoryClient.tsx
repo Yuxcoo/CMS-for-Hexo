@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Check, GitBranch, Plus, RefreshCw, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextInput } from '@/components/ui/Field';
@@ -17,7 +17,6 @@ type Repository = {
 
 export function RepositoryClient() {
   const pathname = usePathname();
-  const router = useRouter();
   const [repos, setRepos] = useState<Repository[]>([]);
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
@@ -28,6 +27,7 @@ export function RepositoryClient() {
 
   async function load() {
     setBusy(true);
+    setMessage('正在加载可访问的 GitHub 仓库...');
     const response = await fetch('/api/repositories');
     const result = await response.json();
     setBusy(false);
@@ -35,6 +35,7 @@ export function RepositoryClient() {
       setMessage(result.error || '加载仓库失败');
       return;
     }
+    setMessage('');
     setRepos(result.repositories || []);
     if (typeof result.viewerLogin === 'string' && result.viewerLogin.trim()) {
       setName((current) => current.trim() || `${result.viewerLogin}.github.io`);
@@ -42,31 +43,58 @@ export function RepositoryClient() {
   }
 
   async function selectRepo(repo: Repository) {
-    const response = await fetch('/api/repositories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'select', owner: repo.owner, repo: repo.name })
-    });
-    const result = await response.json();
-    setMessage(response.ok ? `已连接：${repo.fullName}` : result.error || '连接失败');
-    if (response.ok && pathname === '/onboarding') router.push('/dashboard');
+    setBusy(true);
+    setMessage(`正在连接：${repo.fullName}...`);
+    try {
+      const response = await fetch('/api/repositories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'select', owner: repo.owner, repo: repo.name })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setMessage(result.error || '连接失败');
+        setBusy(false);
+        return;
+      }
+      setMessage(`已连接：${repo.fullName}，正在进入仪表盘...`);
+      if (pathname === '/onboarding') {
+        window.location.assign('/dashboard');
+        return;
+      }
+      setBusy(false);
+    } catch {
+      setMessage('连接失败，请稍后重试');
+      setBusy(false);
+    }
   }
 
   async function createRepo() {
     setBusy(true);
-    const response = await fetch('/api/repositories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'create', name, description, private: isPrivate, initializeHexo: true })
-    });
-    const result = await response.json();
-    setBusy(false);
-    setMessage(response.ok ? `已创建并初始化：${result.repo.full_name}` : result.error || '创建失败');
-    if (response.ok && pathname === '/onboarding') {
-      router.push('/dashboard');
-      return;
+    setMessage(`正在创建并初始化：${name}...`);
+    try {
+      const response = await fetch('/api/repositories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', name, description, private: isPrivate, initializeHexo: true })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setMessage(result.error || '创建失败');
+        setBusy(false);
+        return;
+      }
+      setMessage(`已创建并初始化：${result.repo.full_name}，正在进入仪表盘...`);
+      if (pathname === '/onboarding') {
+        window.location.assign('/dashboard');
+        return;
+      }
+      setBusy(false);
+      load();
+    } catch {
+      setMessage('创建失败，请稍后重试');
+      setBusy(false);
     }
-    if (response.ok) load();
   }
 
   async function initializeCurrent() {
@@ -101,7 +129,7 @@ export function RepositoryClient() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={isPrivate} onChange={(event) => setIsPrivate(event.target.checked)} /> 私有仓库
           </label>
-          <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />创建可发布博客</Button>
+          <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />{busy ? '处理中...' : '创建可发布博客'}</Button>
           <Button variant="secondary" onClick={initializeCurrent} disabled={busy}><Wand2 size={17} />补全当前仓库</Button>
           {message ? <p className="break-all rounded-md bg-[#eef2ee] px-3 py-2 text-sm">{message}</p> : null}
         </div>
@@ -118,6 +146,7 @@ export function RepositoryClient() {
           <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索 owner/repo" />
         </div>
         <div className="max-h-[720px] overflow-auto p-3">
+          {!busy && !filtered.length ? <p className="rounded-md bg-[#f4f6f4] px-3 py-2 text-sm text-[#68746c]">没有找到匹配的仓库。</p> : null}
           {filtered.map((repo) => (
             <article key={repo.fullName} className="mb-3 flex flex-col gap-3 rounded-md border border-line p-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -127,7 +156,7 @@ export function RepositoryClient() {
                   <span className="inline-flex items-center gap-1"><GitBranch size={13} />{repo.defaultBranch}</span>
                 </div>
               </div>
-              <Button variant="secondary" onClick={() => selectRepo(repo)}><Check size={17} />连接</Button>
+              <Button variant="secondary" onClick={() => selectRepo(repo)} disabled={busy}><Check size={17} />{busy ? '请稍候' : '连接'}</Button>
             </article>
           ))}
         </div>
