@@ -119,6 +119,7 @@ jobs:
           const hexo = new Hexo(process.cwd(), { debug: true });
           async function main() {
             await hexo.init();
+            await hexo.load();
             await hexo.call('clean');
             await hexo.call('generate');
             await hexo.exit();
@@ -163,7 +164,13 @@ jobs:
             exit 1
           fi
           ls -la public
-          test -f public/index.html
+          if [ ! -f public/index.html ]; then
+            echo "Hexo generated public, but public/index.html is missing. Public files:"
+            find public -maxdepth 4 -type f -print | sort
+            echo "Hexo database:"
+            ls -la db.json || true
+            exit 1
+          fi
       - name: Publish to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
