@@ -1,5 +1,5 @@
 import YAML from 'yaml';
-import { getFile, putFiles } from './github';
+import { getFile, putFile } from './github';
 import { slugify } from './paths';
 import { stringifyMarkdown } from './hexo';
 
@@ -11,7 +11,15 @@ type CreatePageInput = {
 };
 
 async function getThemeConfigPath(): Promise<{ path: string; raw: string }> {
-  const site = await getFile('_config.yml');
+  let site;
+  try {
+    site = await getFile('_config.yml');
+  } catch (error) {
+    if (String(error).includes('404')) {
+      throw new Error('当前仓库没有找到 _config.yml。请先在“仓库”页补全当前仓库，或确认已连接 Hexo 仓库。');
+    }
+    throw error;
+  }
   const siteConfig = YAML.parse(site.content) as { theme?: unknown } | null;
   const theme = typeof siteConfig?.theme === 'string' && siteConfig.theme.trim() ? siteConfig.theme.trim() : 'landscape';
   const candidates = [`_config.${theme}.yml`, `themes/${theme}/_config.yml`];
@@ -43,12 +51,15 @@ export async function createPage(input: CreatePageInput) {
   const content = stringifyMarkdown({ title, date: new Date().toISOString(), tags: [], categories: [] }, input.body || '');
   const themeConfig = await getThemeConfigPath();
   const themeRaw = updateMenu(themeConfig.raw, menuLabel, pageUrl);
-  const result = await putFiles({
-    message: `Create page: ${title}`,
-    files: [
-      { path: pagePath, content },
-      { path: themeConfig.path, content: themeRaw.endsWith('\n') ? themeRaw : `${themeRaw}\n` }
-    ]
+  const existingPage = await getFile(pagePath).catch((error) => {
+    if (String(error).includes('404')) return null;
+    throw error;
   });
-  return { path: pagePath, url: pageUrl, menuLabel, themeConfigPath: themeConfig.path, commit: result?.commit };
+  const existingTheme = await getFile(themeConfig.path).catch((error) => {
+    if (String(error).includes('404')) return null;
+    throw error;
+  });
+  const pageResult = await putFile({ path: pagePath, content, sha: existingPage?.sha, message: `${existingPage ? 'Update' : 'Create'} page: ${title}` });
+  const themeResult = await putFile({ path: themeConfig.path, content: themeRaw.endsWith('\n') ? themeRaw : `${themeRaw}\n`, sha: existingTheme?.sha, message: `Add page to navigation: ${title}` });
+  return { path: pagePath, url: pageUrl, menuLabel, themeConfigPath: themeConfig.path, commit: themeResult.commit, pageCommit: pageResult.commit };
 }
