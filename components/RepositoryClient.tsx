@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { Check, GitBranch, Plus, RefreshCw, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextInput } from '@/components/ui/Field';
@@ -15,6 +16,8 @@ type Repository = {
 };
 
 export function RepositoryClient() {
+  const pathname = usePathname();
+  const router = useRouter();
   const [repos, setRepos] = useState<Repository[]>([]);
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
@@ -46,6 +49,7 @@ export function RepositoryClient() {
     });
     const result = await response.json();
     setMessage(response.ok ? `已连接：${repo.fullName}` : result.error || '连接失败');
+    if (response.ok && pathname === '/onboarding') router.push('/dashboard');
   }
 
   async function createRepo() {
@@ -58,6 +62,10 @@ export function RepositoryClient() {
     const result = await response.json();
     setBusy(false);
     setMessage(response.ok ? `已创建并初始化：${result.repo.full_name}` : result.error || '创建失败');
+    if (response.ok && pathname === '/onboarding') {
+      router.push('/dashboard');
+      return;
+    }
     if (response.ok) load();
   }
 

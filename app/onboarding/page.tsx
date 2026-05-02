@@ -1,17 +1,18 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { DashboardClient } from '@/components/DashboardClient';
+import { RepositoryClient } from '@/components/RepositoryClient';
 import { getOptionalRepoContext } from '@/lib/repo-context';
 import { isAuthenticated } from '@/lib/session';
 
-export default function DashboardPage() {
+export default function OnboardingPage() {
   if (!isAuthenticated()) redirect('/login');
-  if (!getOptionalRepoContext()) redirect('/onboarding');
+  if (getOptionalRepoContext()) redirect('/dashboard');
+
   return (
     <AppShell>
-      <PageHeader title="仪表盘" description="管理你的 Hexo 仓库、内容与发布状态。" />
-      <DashboardClient />
+      <PageHeader title="连接博客仓库" description="先连接已有 Hexo 仓库，或创建一个新的可发布博客仓库。" />
+      <RepositoryClient />
     </AppShell>
   );
 }
