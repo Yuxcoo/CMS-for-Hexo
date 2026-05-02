@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { parseJson, withAuth } from '@/lib/api';
-import { chooseRepository, createHexoRepository, initializeHexoRepository, listRepositories } from '@/lib/repositories';
+import { chooseRepository, createHexoRepository, getViewerLogin, initializeHexoRepository, listRepositories } from '@/lib/repositories';
 
 export const GET = withAuth(async () => {
-  return NextResponse.json({ repositories: await listRepositories() });
+  const [repositories, viewerLogin] = await Promise.all([listRepositories(), getViewerLogin()]);
+  return NextResponse.json({ repositories, viewerLogin });
 });
 
 export const POST = withAuth(async (request: Request) => {

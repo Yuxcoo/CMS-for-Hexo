@@ -17,7 +17,7 @@ type Repository = {
 export function RepositoryClient() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [query, setQuery] = useState('');
-  const [name, setName] = useState('my-hexo-blog');
+  const [name, setName] = useState('');
   const [description, setDescription] = useState('Hexo blog content repository');
   const [isPrivate, setIsPrivate] = useState(false);
   const [message, setMessage] = useState('');
@@ -33,6 +33,9 @@ export function RepositoryClient() {
       return;
     }
     setRepos(result.repositories || []);
+    if (result.viewerLogin) {
+      setName((current) => current.trim() || `${result.viewerLogin}.github.io`);
+    }
   }
 
   async function selectRepo(repo: Repository) {
@@ -82,7 +85,7 @@ export function RepositoryClient() {
         <h2 className="mb-4 text-lg font-bold">新建博客仓库</h2>
         <div className="grid gap-4">
           <Field label="仓库名">
-            <TextInput value={name} onChange={(event) => setName(event.target.value)} />
+            <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="username.github.io" />
           </Field>
           <Field label="描述">
             <TextInput value={description} onChange={(event) => setDescription(event.target.value)} />
