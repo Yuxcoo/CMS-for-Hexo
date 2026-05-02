@@ -33,7 +33,7 @@ export function RepositoryClient() {
       return;
     }
     setRepos(result.repositories || []);
-    if (result.viewerLogin) {
+    if (typeof result.viewerLogin === 'string' && result.viewerLogin.trim()) {
       setName((current) => current.trim() || `${result.viewerLogin}.github.io`);
     }
   }

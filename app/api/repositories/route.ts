@@ -3,8 +3,8 @@ import { parseJson, withAuth } from '@/lib/api';
 import { chooseRepository, createHexoRepository, getViewerLogin, initializeHexoRepository, listRepositories } from '@/lib/repositories';
 
 export const GET = withAuth(async () => {
-  const [repositories, viewerLogin] = await Promise.all([listRepositories(), getViewerLogin()]);
-  return NextResponse.json({ repositories, viewerLogin });
+  const [repositories, viewer] = await Promise.all([listRepositories(), getViewerLogin()]);
+  return NextResponse.json({ repositories, viewerLogin: viewer.login });
 });
 
 export const POST = withAuth(async (request: Request) => {
