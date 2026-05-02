@@ -4,6 +4,9 @@ import { getRepoContext, setRepoContext, type RepoContext } from './repo-context
 
 const starterPackageJson = {
   private: true,
+  hexo: {
+    version: '^7.3.0'
+  },
   scripts: {
     clean: 'hexo clean',
     build: 'hexo generate',
@@ -195,6 +198,7 @@ Expected site URL: ${getSiteUrl(context)}
 function mergePackageJson(current: string) {
   const parsed = JSON.parse(current || '{}') as {
     private?: boolean;
+    hexo?: Record<string, unknown>;
     scripts?: Record<string, string>;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
@@ -203,6 +207,7 @@ function mergePackageJson(current: string) {
     {
       ...parsed,
       private: parsed.private ?? starterPackageJson.private,
+      hexo: { ...starterPackageJson.hexo, ...(parsed.hexo || {}) },
       scripts: { ...starterPackageJson.scripts, ...(parsed.scripts || {}) },
       dependencies: { ...starterPackageJson.dependencies, ...(parsed.dependencies || {}) }
     },
