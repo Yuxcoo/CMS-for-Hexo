@@ -1,5 +1,5 @@
 import { getConfig } from './config';
-import { createRepository, fileExists, getAuthenticatedUser, getFile, listAccessibleRepos, putFile } from './github';
+import { createRepository, fileExists, getAuthenticatedUser, getFile, listAccessibleRepos, putFiles } from './github';
 import { getRepoContext, setRepoContext, type RepoContext } from './repo-context';
 
 const starterPackageJson = {
@@ -267,14 +267,16 @@ export async function initializeHexoRepository(context?: RepoContext) {
   ];
 
   const created: string[] = [];
+  const pendingFiles: Array<{ path: string; content: string }> = [];
   for (const file of files) {
     const existing = await fileExists(file.path, target);
     if (existing && !file.overwrite) continue;
     const current = existing ? await getFile(file.path, target) : null;
     const content = current && file.merge ? file.merge(current.content) : file.content;
-    await putFile({ path: file.path, content, sha: current?.sha, message: `${existing ? 'Update' : 'Initialize'} Hexo file: ${file.path}`, context: target });
+    pendingFiles.push({ path: file.path, content });
     created.push(file.path);
   }
+  await putFiles({ files: pendingFiles, message: 'Initialize Hexo project files', context: target });
   return { created };
 }
 

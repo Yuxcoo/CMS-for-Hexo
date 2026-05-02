@@ -107,6 +107,37 @@ export async function putFile(params: { path: string; content?: string; contentB
   });
 }
 
+export async function putFiles(params: { files: Array<{ path: string; content: string }>; message: string; context?: RepoContext }) {
+  if (!params.files.length) return null;
+  const config = getConfig();
+  const context = params.context || getRepoContext();
+  const repoPath = (suffix: string) => repoApiPathFor(context, suffix);
+  const refPath = `/git/ref/heads/${encodeURIComponent(config.GITHUB_BRANCH)}`;
+  const ref = await githubFetch<{ object: { sha: string } }>(repoPath(refPath));
+  const baseCommit = await githubFetch<{ tree: { sha: string } }>(repoPath(`/git/commits/${ref.object.sha}`));
+  const tree = await githubFetch<{ sha: string }>(repoPath('/git/trees'), {
+    method: 'POST',
+    body: JSON.stringify({
+      base_tree: baseCommit.tree.sha,
+      tree: params.files.map((file) => ({
+        path: assertSafeRepoPath(file.path),
+        mode: '100644',
+        type: 'blob',
+        content: file.content
+      }))
+    })
+  });
+  const commit = await githubFetch<{ sha: string; html_url: string }>(repoPath('/git/commits'), {
+    method: 'POST',
+    body: JSON.stringify({ message: params.message, tree: tree.sha, parents: [ref.object.sha] })
+  });
+  await githubFetch(repoPath(refPath), {
+    method: 'PATCH',
+    body: JSON.stringify({ sha: commit.sha })
+  });
+  return { commit };
+}
+
 export async function deleteFile(params: { path: string; sha: string; message: string }) {
   const config = getConfig();
   return githubFetch<{ commit: { sha: string; html_url: string } }>(repoApiPath(`/contents/${encodePath(params.path)}`), {
@@ -120,9 +151,10 @@ export async function listRecentCommits(): Promise<GitHubCommit[]> {
   return githubFetch<GitHubCommit[]>(repoApiPath(`/commits?sha=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
 }
 
-export async function listWorkflowRuns(): Promise<WorkflowRun[]> {
+export async function listWorkflowRuns(workflow?: GitHubWorkflow): Promise<WorkflowRun[]> {
   const config = getConfig();
-  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(`/actions/runs?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
+  const suffix = workflow ? `/actions/workflows/${workflow.id}/runs` : '/actions/runs';
+  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(`${suffix}?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
   return result.workflow_runs;
 }
 
@@ -158,6 +190,16 @@ export async function resolvePublishWorkflow(): Promise<GitHubWorkflow> {
 export async function dispatchWorkflow() {
   const config = getConfig();
   const workflow = await resolvePublishWorkflow();
+  const [runs, commits] = await Promise.all([listWorkflowRuns(workflow).catch(() => []), listRecentCommits().catch(() => [])]);
+  const activeRun = runs.find((run) => run.status === 'queued' || run.status === 'in_progress' || run.status === 'waiting' || run.status === 'requested');
+  if (activeRun) {
+    throw new Error('发布 workflow 已在运行中，请等待当前发布完成后再手动触发。');
+  }
+  const latestCommit = commits[0];
+  const latestRun = runs[0];
+  if (latestCommit && latestRun?.head_sha === latestCommit.sha && latestRun.status === 'completed' && latestRun.conclusion === 'success') {
+    throw new Error('当前最新提交已经发布成功，无需重复触发。');
+  }
   await githubFetch<void>(repoApiPath(`/actions/workflows/${workflow.id}/dispatches`), {
     method: 'POST',
     body: JSON.stringify({ ref: config.GITHUB_BRANCH })
