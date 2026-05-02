@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { FileText, Gauge, Github, Image, LogOut, Rocket, ScrollText, Settings2, SlidersHorizontal } from 'lucide-react';
+import { FileText, Gauge, Github, Image, LogOut, PanelTop, Rocket, ScrollText, Settings2, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 const nav = [
   { href: '/dashboard', label: '仪表盘', icon: Gauge },
   { href: '/posts', label: '文章', icon: FileText },
   { href: '/drafts', label: '草稿', icon: ScrollText },
+  { href: '/pages', label: '页面', icon: PanelTop },
   { href: '/media', label: '图片', icon: Image },
   { href: '/publish', label: '发布', icon: Rocket },
   { href: '/versions', label: '版本', icon: Settings2 },

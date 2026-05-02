@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Save, Trash2, UploadCloud } from 'lucide-react';
+import { FilePenLine, Save, Trash2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextArea, TextInput } from '@/components/ui/Field';
 import { renderMarkdownPreview } from '@/lib/markdown-preview';
@@ -50,18 +50,18 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     setMeta((current) => ({ ...current, [key]: value }));
   }
 
-  async function save() {
+  async function save(targetKind: PostKind = kind) {
     if (!meta.title.trim()) {
       setMessage('标题不能为空');
       return;
     }
     setBusy(true);
-    setMessage('');
-    const endpoint = kind === 'post' ? '/api/posts' : '/api/drafts';
+    setMessage(targetKind === 'post' ? '正在保存并触发发布...' : '正在保存到草稿...');
+    const endpoint = targetKind === 'post' ? '/api/posts' : '/api/drafts';
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, meta, body, path: path || undefined, originalPath: initial?.path, sha: sha || undefined })
+      body: JSON.stringify({ kind: targetKind, meta, body, path: targetKind === kind ? path || undefined : undefined, originalPath: targetKind === kind ? initial?.path : undefined, sha: targetKind === kind ? sha || undefined : undefined })
     });
     const result = await response.json();
     setBusy(false);
@@ -71,7 +71,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     }
     setPath(result.path);
     setSha(result.sha);
-    setMessage(`已保存：${result.commit?.sha?.slice(0, 7) || result.sha.slice(0, 7)}`);
+    setMessage(`${targetKind === 'post' ? '已保存，GitHub Actions 将自动发布' : '已保存至草稿'}：${result.commit?.sha?.slice(0, 7) || result.sha.slice(0, 7)}`);
     onSaved?.({ path: result.path, sha: result.sha });
   }
 
@@ -95,6 +95,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   async function publishDraft() {
     if (!path) return;
     setBusy(true);
+    setMessage('正在发布草稿...');
     const response = await fetch('/api/drafts', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -108,6 +109,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   async function moveToDraft() {
     if (!path || !confirm('确认把这篇文章转为草稿？')) return;
     setBusy(true);
+    setMessage('正在转为草稿...');
     const response = await fetch('/api/drafts', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -141,7 +143,8 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
             <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} />
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={save} disabled={busy}><Save size={17} />保存</Button>
+            <Button onClick={() => save()} disabled={busy}><Save size={17} />{busy ? '保存中...' : '保存'}</Button>
+            {kind === 'post' && !path ? <Button variant="secondary" onClick={() => save('draft')} disabled={busy}><FilePenLine size={17} />保存至草稿</Button> : null}
             {kind === 'draft' && path ? <Button variant="secondary" onClick={publishDraft} disabled={busy}><UploadCloud size={17} />发布</Button> : null}
             {kind === 'post' && path ? <Button variant="secondary" onClick={moveToDraft} disabled={busy}><UploadCloud size={17} />转草稿</Button> : null}
             {path ? <Button variant="danger" onClick={remove} disabled={busy}><Trash2 size={17} />删除</Button> : null}
