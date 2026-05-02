@@ -1,65 +1,101 @@
 import YAML from 'yaml';
-import { getFile, putFile } from './github';
-import { slugify } from './paths';
-import { stringifyMarkdown } from './hexo';
+import { getFile, listDirectory, putFile } from './github';
+import { normalizeRepoPath, slugify } from './paths';
+import { parseMarkdown, stringifyMarkdown } from './hexo';
 
-type CreatePageInput = {
+type SavePageInput = {
   title: string;
   slug?: string;
   body?: string;
   menuLabel?: string;
+  path?: string;
+  sha?: string;
 };
 
-async function getThemeConfigPath(): Promise<{ path: string; raw: string }> {
-  let site;
+export type PageSummary = {
+  title: string;
+  slug: string;
+  path: string;
+  url: string;
+  sha: string;
+};
+
+function pagePathFromSlug(slug: string) {
+  return `source/${slugify(slug)}/index.md`;
+}
+
+function slugFromPath(path: string) {
+  const normalized = normalizeRepoPath(path);
+  return normalized.replace(/^source\//, '').replace(/\/index\.md$/i, '');
+}
+
+async function getSiteConfig() {
   try {
-    site = await getFile('_config.yml');
+    const file = await getFile('_config.yml');
+    return { sha: file.sha, raw: file.content, data: (YAML.parse(file.content) || {}) as Record<string, unknown> };
   } catch (error) {
     if (String(error).includes('404')) {
       throw new Error('当前仓库没有找到 _config.yml。请先在“仓库”页补全当前仓库，或确认已连接 Hexo 仓库。');
     }
     throw error;
   }
-  const siteConfig = YAML.parse(site.content) as { theme?: unknown } | null;
-  const theme = typeof siteConfig?.theme === 'string' && siteConfig.theme.trim() ? siteConfig.theme.trim() : 'landscape';
-  const candidates = [`_config.${theme}.yml`, `themes/${theme}/_config.yml`];
-  for (const path of candidates) {
-    try {
-      const file = await getFile(path);
-      return { path, raw: file.content };
-    } catch (error) {
-      if (!String(error).includes('404')) throw error;
-    }
-  }
-  return { path: `_config.${theme}.yml`, raw: '# Theme config\n' };
 }
 
-function updateMenu(raw: string, label: string, url: string): string {
+function updateThemeMenu(raw: string, label: string, url: string): string {
   const parsed = (YAML.parse(raw) || {}) as Record<string, unknown>;
-  const existingMenu = parsed.menu && typeof parsed.menu === 'object' && !Array.isArray(parsed.menu) ? parsed.menu as Record<string, unknown> : {};
-  parsed.menu = { ...existingMenu, [label]: url };
+  const themeConfig = parsed.theme_config && typeof parsed.theme_config === 'object' && !Array.isArray(parsed.theme_config)
+    ? parsed.theme_config as Record<string, unknown>
+    : {};
+  const menu = themeConfig.menu && typeof themeConfig.menu === 'object' && !Array.isArray(themeConfig.menu)
+    ? themeConfig.menu as Record<string, unknown>
+    : {};
+  const nextMenu = Object.fromEntries(Object.entries(menu).filter(([, value]) => value !== url));
+  parsed.theme_config = { ...themeConfig, menu: { ...nextMenu, [label]: url } };
   return YAML.stringify(parsed, { lineWidth: 0 });
 }
 
-export async function createPage(input: CreatePageInput) {
+export async function listPages(): Promise<PageSummary[]> {
+  const entries = await listDirectory('source').catch((error) => {
+    if (String(error).includes('404')) return [];
+    throw error;
+  });
+  const dirs = entries.filter((entry) => entry.type === 'dir' && !entry.name.startsWith('_'));
+  const pages = await Promise.all(dirs.map(async (dir) => {
+    try {
+      const file = await getFile(`${dir.path}/index.md`);
+      const parsed = parseMarkdown(file.content);
+      const slug = slugFromPath(file.path);
+      return { title: parsed.meta.title || slug, slug, path: file.path, url: `/${slug}/`, sha: file.sha } satisfies PageSummary;
+    } catch (error) {
+      if (String(error).includes('404')) return null;
+      throw error;
+    }
+  }));
+  return pages.filter((page): page is PageSummary => Boolean(page)).sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export async function getPage(path: string) {
+  const file = await getFile(path);
+  const parsed = parseMarkdown(file.content);
+  const slug = slugFromPath(file.path);
+  return { title: parsed.meta.title || slug, slug, path: file.path, url: `/${slug}/`, sha: file.sha, body: parsed.body };
+}
+
+export async function savePage(input: SavePageInput) {
   const title = input.title.trim();
   if (!title) throw new Error('页面标题不能为空');
   const slug = slugify(input.slug || title);
   const menuLabel = (input.menuLabel || title).trim();
-  const pagePath = `source/${slug}/index.md`;
-  const pageUrl = `/${slug}/`;
+  const pagePath = input.path ? normalizeRepoPath(input.path) : pagePathFromSlug(slug);
+  const pageUrl = `/${slugFromPath(pagePath)}/`;
   const content = stringifyMarkdown({ title, date: new Date().toISOString(), tags: [], categories: [] }, input.body || '');
-  const themeConfig = await getThemeConfigPath();
-  const themeRaw = updateMenu(themeConfig.raw, menuLabel, pageUrl);
-  const existingPage = await getFile(pagePath).catch((error) => {
-    if (String(error).includes('404')) return null;
-    throw error;
-  });
-  const existingTheme = await getFile(themeConfig.path).catch((error) => {
+  const siteConfig = await getSiteConfig();
+  const siteRaw = updateThemeMenu(siteConfig.raw, menuLabel, pageUrl);
+  const existingPage = input.sha ? { sha: input.sha } : await getFile(pagePath).catch((error) => {
     if (String(error).includes('404')) return null;
     throw error;
   });
   const pageResult = await putFile({ path: pagePath, content, sha: existingPage?.sha, message: `${existingPage ? 'Update' : 'Create'} page: ${title}` });
-  const themeResult = await putFile({ path: themeConfig.path, content: themeRaw.endsWith('\n') ? themeRaw : `${themeRaw}\n`, sha: existingTheme?.sha, message: `Add page to navigation: ${title}` });
-  return { path: pagePath, url: pageUrl, menuLabel, themeConfigPath: themeConfig.path, commit: themeResult.commit, pageCommit: pageResult.commit };
+  const siteResult = await putFile({ path: '_config.yml', content: siteRaw.endsWith('\n') ? siteRaw : `${siteRaw}\n`, sha: siteConfig.sha, message: `Update navigation: ${menuLabel}` });
+  return { path: pagePath, url: pageUrl, menuLabel, configPath: '_config.yml', sha: pageResult.content.sha, commit: siteResult.commit, pageCommit: pageResult.commit };
 }

@@ -58,6 +58,10 @@ pretty_urls:
   trailing_index: true
   trailing_html: true
 theme: landscape
+theme_config:
+  menu:
+    Home: /
+    About: /about/
 highlight:
   enable: true
   line_number: true
