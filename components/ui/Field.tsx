@@ -15,7 +15,7 @@ export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
   return <input ref={ref} className={`min-h-10 w-full rounded-full border border-line bg-canvas px-4 py-2 text-[15px] font-normal leading-[1.45] tracking-[-0.18px] text-ink outline-none transition placeholder:text-muted focus:border-blueFocus focus:ring-2 focus:ring-blueFocus/20 disabled:bg-paper disabled:text-muted ${className}`} {...rest} />;
 });
 
-export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function TextArea(props, ref) {
   const { className = '', ...rest } = props;
-  return <textarea className={`min-h-32 w-full rounded-[14px] border border-line bg-canvas px-4 py-3 text-[15px] font-normal leading-[1.5] tracking-[-0.18px] text-ink outline-none transition placeholder:text-muted focus:border-blueFocus focus:ring-2 focus:ring-blueFocus/20 disabled:bg-paper disabled:text-muted ${className}`} {...rest} />;
-}
+  return <textarea ref={ref} className={`min-h-32 w-full rounded-[14px] border border-line bg-canvas px-4 py-3 text-[15px] font-normal leading-[1.5] tracking-[-0.18px] text-ink outline-none transition placeholder:text-muted focus:border-blueFocus focus:ring-2 focus:ring-blueFocus/20 disabled:bg-paper disabled:text-muted ${className}`} {...rest} />;
+});
