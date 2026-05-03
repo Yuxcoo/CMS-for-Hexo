@@ -156,7 +156,8 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
           </div>
         </div>
         {showMeta ? (
-          <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 p-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Field label="标题">
               <TextInput value={meta.title} onChange={(event) => updateMeta('title', event.target.value)} placeholder="我的新文章" />
             </Field>
@@ -169,25 +170,30 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
             <Field label="发布日期">
               <TextInput value={meta.date || ''} onChange={(event) => updateMeta('date', event.target.value)} placeholder="2026-05-01T10:00:00.000Z" />
             </Field>
-            <Field label="标签">
-              <TextInput value={arrayToText(meta.tags)} onChange={(event) => updateMeta('tags', textToArray(event.target.value))} placeholder="逗号分隔" />
-            </Field>
-            <Field label="分类">
-              <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} placeholder="逗号分隔" />
-            </Field>
-            <Field label="摘要" className="md:col-span-2 xl:col-span-2 xl:row-span-2">
-              <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-[132px] xl:h-full xl:min-h-0" />
-            </Field>
-            <Field label="priority">
-              <TextInput type="number" value={Number(meta.priority || 0)} onChange={(event) => updateMeta('priority', Number(event.target.value || 0))} />
-            </Field>
-            <label className="grid content-start items-start gap-1 self-start text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink">
-              <span>置顶</span>
-              <button type="button" onClick={() => updateMeta('sticky', !meta.sticky)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[14px] font-normal transition active:scale-95 ${meta.sticky ? 'border-blue bg-blue text-white' : 'border-line bg-canvas text-ink hover:border-blue'}`}>
-                {meta.sticky ? <Pin size={15} /> : <PinOff size={15} />}
-                {meta.sticky ? '已置顶' : '未置顶'}
-              </button>
-            </label>
+            </div>
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(320px,1.15fr)]">
+              <div className="grid gap-3 md:grid-cols-2 xl:col-span-2 xl:grid-cols-2">
+                <Field label="标签">
+                  <TextInput value={arrayToText(meta.tags)} onChange={(event) => updateMeta('tags', textToArray(event.target.value))} placeholder="逗号分隔" />
+                </Field>
+                <Field label="分类">
+                  <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} placeholder="逗号分隔" />
+                </Field>
+                <Field label="priority">
+                  <TextInput type="number" value={Number(meta.priority || 0)} onChange={(event) => updateMeta('priority', Number(event.target.value || 0))} />
+                </Field>
+                <label className="grid content-start items-start gap-1 self-start text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink">
+                  <span>置顶</span>
+                  <button type="button" onClick={() => updateMeta('sticky', !meta.sticky)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[14px] font-normal transition active:scale-95 ${meta.sticky ? 'border-blue bg-blue text-white' : 'border-line bg-canvas text-ink hover:border-blue'}`}>
+                    {meta.sticky ? <Pin size={15} /> : <PinOff size={15} />}
+                    {meta.sticky ? '已置顶' : '未置顶'}
+                  </button>
+                </label>
+              </div>
+              <Field label="摘要" className="xl:self-stretch">
+                <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-[132px] xl:min-h-[141px]" />
+              </Field>
+            </div>
           </div>
         ) : null}
         {message ? <p className="mx-4 mb-4 apple-message break-all">{message}</p> : null}

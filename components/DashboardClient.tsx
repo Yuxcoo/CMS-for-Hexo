@@ -29,9 +29,9 @@ export function DashboardClient() {
     <div className="grid gap-4">
       <section className="rounded-[14px] border border-line bg-canvas p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 lg:min-h-[92px]">
+          <div className="min-w-0 lg:min-h-[104px]">
             <div className="text-[13px] font-semibold leading-none tracking-[-0.12px] text-muted">当前仓库</div>
-            <h2 className="mt-2 break-all font-display text-[28px] font-semibold leading-[1.18] tracking-[-0.24px] text-ink sm:text-[32px]">{repoName}</h2>
+            <h2 className="mt-2 pb-1 font-display text-[28px] font-semibold leading-[1.24] tracking-[-0.24px] text-ink sm:text-[32px]">{repoName}</h2>
             {health?.config && !health.config.ok ? <p className="mt-2 text-[14px] leading-[1.4] text-danger">{health.config.error}</p> : null}
           </div>
           <div className="grid gap-2 text-[14px] leading-[1.35] tracking-[-0.12px] text-muted sm:grid-cols-2 lg:min-w-[540px] lg:grid-cols-4">

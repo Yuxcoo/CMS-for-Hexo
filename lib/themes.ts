@@ -33,6 +33,10 @@ const maxThemeFileCount = 1200;
 const editableExtensions = new Set([
   '.css', '.ejs', '.html', '.js', '.json', '.jsx', '.less', '.md', '.njk', '.pug', '.sass', '.scss', '.styl', '.swig', '.ts', '.tsx', '.txt', '.xml', '.yaml', '.yml'
 ]);
+const themeSupportDependencies = {
+  'hexo-renderer-pug': '^3.0.0',
+  'hexo-renderer-stylus': '^3.0.1'
+};
 
 function readUInt16(buffer: Buffer, offset: number) {
   return buffer.readUInt16LE(offset);
@@ -157,6 +161,23 @@ async function hasFile(path: string) {
   return Boolean(await optionalFile(path));
 }
 
+async function ensureThemeSupportPackages() {
+  const current = await optionalFile('package.json');
+  const parsed = JSON.parse(current?.content || '{}') as {
+    dependencies?: Record<string, string>;
+    [key: string]: unknown;
+  };
+  const nextDependencies = { ...themeSupportDependencies, ...(parsed.dependencies || {}) };
+  const nextContent = `${JSON.stringify({ ...parsed, dependencies: nextDependencies }, null, 2)}\n`;
+  if (current?.content === nextContent) return null;
+  return putFile({
+    path: 'package.json',
+    content: nextContent,
+    sha: current?.sha,
+    message: 'Ensure Hexo theme renderer dependencies'
+  });
+}
+
 export async function listThemes(): Promise<{ activeTheme: string; themes: ThemeSummary[] }> {
   const activeTheme = await activeThemeName();
   const entries = await listDirectory('themes').catch((error) => {
@@ -201,6 +222,7 @@ export async function installTheme(input: InstallThemeInput) {
     return { path: joinRepoPath('themes', themeName, relative), contentBase64: file.contentBase64 };
   });
   await putFiles({ files, message: `Install Hexo theme: ${themeName}` });
+  await ensureThemeSupportPackages();
   const activation = input.activate === false ? null : await activateTheme(themeName);
   return { theme: themeName, installed: files.length, activated: Boolean(activation), commit: activation?.commit };
 }
