@@ -10,6 +10,18 @@ function encodePath(path: string): string {
   return assertSafeRepoPath(path).split('/').map(encodeURIComponent).join('/');
 }
 
+function branchFor(context: RepoContext): string {
+  return context.branch || getConfig().GITHUB_BRANCH;
+}
+
+function isNotFound(error: unknown) {
+  return String(error).includes('GitHub API 404');
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function githubFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const config = getConfig();
   const response = await fetch(`${apiBase}${path}`, {
@@ -33,8 +45,7 @@ async function githubFetch<T>(path: string, init: RequestInit = {}): Promise<T> 
 }
 
 export function repoApiPath(suffix: string): string {
-  const context = getRepoContext();
-  return repoApiPathFor(context, suffix);
+  return repoApiPathFor(getRepoContext(), suffix);
 }
 
 export function repoApiPathFor(context: RepoContext, suffix: string): string {
@@ -49,6 +60,11 @@ export async function listAccessibleRepos() {
 
 export async function getAuthenticatedUser() {
   return githubFetch<{ login: string }>('/user');
+}
+
+export async function getRepository(context?: RepoContext) {
+  const target = context || getRepoContext();
+  return githubFetch<{ name: string; full_name: string; private: boolean; default_branch: string; html_url: string; owner: { login: string } }>(repoApiPathFor(target, ''));
 }
 
 export async function createRepository(params: { name: string; description?: string; private?: boolean; autoInit?: boolean }) {
@@ -68,52 +84,73 @@ export async function fileExists(path: string, context?: RepoContext): Promise<b
     await getFile(path, context);
     return true;
   } catch (error) {
-    if (String(error).includes('404')) return false;
+    if (isNotFound(error)) return false;
     throw error;
   }
 }
 
 export async function listDirectory(path: string): Promise<GitHubFile[]> {
-  const config = getConfig();
+  const context = getRepoContext();
   const encoded = encodePath(path);
   const contentsPath = encoded ? `/contents/${encoded}` : '/contents';
   const result = await githubFetch<GitHubFile | GitHubFile[]>(
-    repoApiPath(`${contentsPath}?ref=${encodeURIComponent(config.GITHUB_BRANCH)}`)
+    repoApiPathFor(context, `${contentsPath}?ref=${encodeURIComponent(branchFor(context))}`)
   );
   return Array.isArray(result) ? result : [];
 }
 
 export async function getFile(path: string, context?: RepoContext): Promise<{ content: string; sha: string; path: string; name: string; size: number }> {
-  const config = getConfig();
-  const suffix = `/contents/${encodePath(path)}?ref=${encodeURIComponent(config.GITHUB_BRANCH)}`;
-  const file = await githubFetch<GitHubFile & { content: string; encoding: string }>(
-    context ? repoApiPathFor(context, suffix) : repoApiPath(suffix)
-  );
+  const target = context || getRepoContext();
+  const suffix = `/contents/${encodePath(path)}?ref=${encodeURIComponent(branchFor(target))}`;
+  const file = await githubFetch<GitHubFile & { content: string; encoding: string }>(repoApiPathFor(target, suffix));
   const content = Buffer.from(file.content.replace(/\n/g, ''), 'base64').toString('utf8');
   return { content, sha: file.sha, path: file.path, name: file.name, size: file.size };
 }
 
 export async function putFile(params: { path: string; content?: string; contentBase64?: string; message: string; sha?: string; context?: RepoContext }) {
-  const config = getConfig();
+  const context = params.context || getRepoContext();
   const suffix = `/contents/${encodePath(params.path)}`;
-  return githubFetch<{ content: GitHubFile; commit: { sha: string; html_url: string } }>(params.context ? repoApiPathFor(params.context, suffix) : repoApiPath(suffix), {
+  return githubFetch<{ content: GitHubFile; commit: { sha: string; html_url: string } }>(repoApiPathFor(context, suffix), {
     method: 'PUT',
     body: JSON.stringify({
       message: params.message,
       content: params.contentBase64 || Buffer.from(params.content || '', 'utf8').toString('base64'),
-      branch: config.GITHUB_BRANCH,
+      branch: branchFor(context),
       sha: params.sha
     })
   });
 }
 
+async function getHeadRef(context: RepoContext) {
+  let branch = branchFor(context);
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const refPath = `/git/ref/heads/${encodeURIComponent(branch)}`;
+      const ref = await githubFetch<{ object: { sha: string } }>(repoApiPathFor(context, refPath));
+      return { branch, refPath, ref };
+    } catch (error) {
+      lastError = error;
+      if (!isNotFound(error)) throw error;
+
+      const repo = await getRepository(context).catch(() => null);
+      if (repo?.default_branch && repo.default_branch !== branch) {
+        branch = repo.default_branch;
+      } else {
+        await sleep(750 * (attempt + 1));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export async function putFiles(params: { files: Array<{ path: string; content: string }>; message: string; context?: RepoContext }) {
   if (!params.files.length) return null;
-  const config = getConfig();
   const context = params.context || getRepoContext();
   const repoPath = (suffix: string) => repoApiPathFor(context, suffix);
-  const refPath = `/git/ref/heads/${encodeURIComponent(config.GITHUB_BRANCH)}`;
-  const ref = await githubFetch<{ object: { sha: string } }>(repoPath(refPath));
+  const { refPath, ref } = await getHeadRef(context);
   const baseCommit = await githubFetch<{ tree: { sha: string } }>(repoPath(`/git/commits/${ref.object.sha}`));
   const tree = await githubFetch<{ sha: string }>(repoPath('/git/trees'), {
     method: 'POST',
@@ -139,22 +176,22 @@ export async function putFiles(params: { files: Array<{ path: string; content: s
 }
 
 export async function deleteFile(params: { path: string; sha: string; message: string }) {
-  const config = getConfig();
-  return githubFetch<{ commit: { sha: string; html_url: string } }>(repoApiPath(`/contents/${encodePath(params.path)}`), {
+  const context = getRepoContext();
+  return githubFetch<{ commit: { sha: string; html_url: string } }>(repoApiPathFor(context, `/contents/${encodePath(params.path)}`), {
     method: 'DELETE',
-    body: JSON.stringify({ message: params.message, sha: params.sha, branch: config.GITHUB_BRANCH })
+    body: JSON.stringify({ message: params.message, sha: params.sha, branch: branchFor(context) })
   });
 }
 
 export async function listRecentCommits(): Promise<GitHubCommit[]> {
-  const config = getConfig();
-  return githubFetch<GitHubCommit[]>(repoApiPath(`/commits?sha=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
+  const context = getRepoContext();
+  return githubFetch<GitHubCommit[]>(repoApiPathFor(context, `/commits?sha=${encodeURIComponent(branchFor(context))}&per_page=10`));
 }
 
 export async function listWorkflowRuns(workflow?: GitHubWorkflow): Promise<WorkflowRun[]> {
-  const config = getConfig();
+  const context = getRepoContext();
   const suffix = workflow ? `/actions/workflows/${workflow.id}/runs` : '/actions/runs';
-  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPath(`${suffix}?branch=${encodeURIComponent(config.GITHUB_BRANCH)}&per_page=10`));
+  const result = await githubFetch<{ workflow_runs: WorkflowRun[] }>(repoApiPathFor(context, `${suffix}?branch=${encodeURIComponent(branchFor(context))}&per_page=10`));
   return result.workflow_runs;
 }
 
@@ -188,7 +225,7 @@ export async function resolvePublishWorkflow(): Promise<GitHubWorkflow> {
 }
 
 export async function dispatchWorkflow() {
-  const config = getConfig();
+  const context = getRepoContext();
   const workflow = await resolvePublishWorkflow();
   const [runs, commits] = await Promise.all([listWorkflowRuns(workflow).catch(() => []), listRecentCommits().catch(() => [])]);
   const activeRun = runs.find((run) => run.status === 'queued' || run.status === 'in_progress' || run.status === 'waiting' || run.status === 'requested');
@@ -200,9 +237,9 @@ export async function dispatchWorkflow() {
   if (latestCommit && latestRun?.head_sha === latestCommit.sha && latestRun.status === 'completed' && latestRun.conclusion === 'success') {
     throw new Error('当前最新提交已经发布成功，无需重复触发。');
   }
-  await githubFetch<void>(repoApiPath(`/actions/workflows/${workflow.id}/dispatches`), {
+  await githubFetch<void>(repoApiPathFor(context, `/actions/workflows/${workflow.id}/dispatches`), {
     method: 'POST',
-    body: JSON.stringify({ ref: config.GITHUB_BRANCH })
+    body: JSON.stringify({ ref: branchFor(context) })
   });
   return workflow;
 }

@@ -8,10 +8,10 @@ export const GET = withAuth(async () => {
 });
 
 export const POST = withAuth(async (request: Request) => {
-  const body = await parseJson<{ action: 'select' | 'create' | 'initialize'; owner?: string; repo?: string; name?: string; description?: string; private?: boolean; initializeHexo?: boolean }>(request);
+  const body = await parseJson<{ action: 'select' | 'create' | 'initialize'; owner?: string; repo?: string; branch?: string; name?: string; description?: string; private?: boolean; initializeHexo?: boolean }>(request);
   if (body.action === 'select') {
     if (!body.owner || !body.repo) return NextResponse.json({ error: 'owner and repo are required' }, { status: 400 });
-    return NextResponse.json({ context: await chooseRepository({ owner: body.owner, repo: body.repo }) });
+    return NextResponse.json({ context: await chooseRepository({ owner: body.owner, repo: body.repo, branch: body.branch }) });
   }
   if (body.action === 'create') {
     if (!body.name) return NextResponse.json({ error: 'name is required' }, { status: 400 });

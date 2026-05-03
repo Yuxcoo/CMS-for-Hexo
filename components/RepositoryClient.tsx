@@ -49,7 +49,7 @@ export function RepositoryClient() {
       const response = await fetch('/api/repositories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'select', owner: repo.owner, repo: repo.name })
+        body: JSON.stringify({ action: 'select', owner: repo.owner, repo: repo.name, branch: repo.defaultBranch })
       });
       const result = await response.json();
       if (!response.ok) {

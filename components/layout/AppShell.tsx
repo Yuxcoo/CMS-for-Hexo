@@ -56,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </a>
               <GlobalSearch />
               <ThemeModeControl />
-              <button type="button" onClick={logout} className="hidden min-h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[13px] leading-none tracking-[-0.12px] text-white transition active:scale-95 sm:inline-flex">
+              <button type="button" onClick={logout} className="hidden min-h-8 items-center gap-1.5 rounded-lg border border-white/24 bg-white/10 px-3 text-[13px] leading-none tracking-[-0.12px] text-white transition hover:bg-white/18 active:scale-95 sm:inline-flex">
                 <LogOut size={15} /> 登出
               </button>
               <Menu size={19} className="lg:hidden" />

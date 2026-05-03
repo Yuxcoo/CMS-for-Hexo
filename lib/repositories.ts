@@ -244,7 +244,7 @@ export async function chooseRepository(context: RepoContext) {
 
 export async function createHexoRepository(params: { name: string; description?: string; private?: boolean; initializeHexo?: boolean }) {
   const repo = await createRepository({ name: params.name, description: params.description, private: params.private, autoInit: true });
-  const context = { owner: repo.owner.login, repo: repo.name };
+  const context = { owner: repo.owner.login, repo: repo.name, branch: repo.default_branch };
   setRepoContext(context);
   if (params.initializeHexo ?? true) {
     await initializeHexoRepository(context);

@@ -43,7 +43,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   const [sha, setSha] = useState(initial?.sha || '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [showMeta, setShowMeta] = useState(true);
+  const [showMeta, setShowMeta] = useState(false);
   const preview = useMemo(() => renderMarkdownPreview(body || ''), [body]);
 
   useEffect(() => {
