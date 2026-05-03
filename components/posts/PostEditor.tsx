@@ -181,7 +181,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
             <Field label="priority">
               <TextInput type="number" value={Number(meta.priority || 0)} onChange={(event) => updateMeta('priority', Number(event.target.value || 0))} />
             </Field>
-            <label className="grid gap-1 text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink">
+            <label className="grid content-start items-start gap-1 self-start text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink">
               <span>置顶</span>
               <button type="button" onClick={() => updateMeta('sticky', !meta.sticky)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[14px] font-normal transition active:scale-95 ${meta.sticky ? 'border-blue bg-blue text-white' : 'border-line bg-canvas text-ink hover:border-blue'}`}>
                 {meta.sticky ? <Pin size={15} /> : <PinOff size={15} />}

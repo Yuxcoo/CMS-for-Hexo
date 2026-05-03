@@ -3,7 +3,7 @@ import { forwardRef } from 'react';
 
 export function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <label className={`grid gap-1 text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink ${className}`}>
+    <label className={`grid content-start items-start gap-1 self-start text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink ${className}`}>
       <span>{label}</span>
       {children}
     </label>

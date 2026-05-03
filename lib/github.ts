@@ -144,7 +144,7 @@ export async function resolveRepositoryContext(context?: RepoContext): Promise<R
   return resolveWritableContext(context || getRepoContext());
 }
 
-export async function putFiles(params: { files: Array<{ path: string; content: string }>; message: string; context?: RepoContext }) {
+export async function putFiles(params: { files: Array<{ path: string; content?: string; contentBase64?: string }>; message: string; context?: RepoContext }) {
   if (!params.files.length) return null;
   const context = await resolveWritableContext(params.context || getRepoContext());
   let latestCommit: { sha: string; html_url: string } | null = null;
@@ -154,7 +154,7 @@ export async function putFiles(params: { files: Array<{ path: string; content: s
       if (isNotFound(error)) return null;
       throw error;
     });
-    const saved = await retryNotFound(() => putFile({ path: file.path, content: file.content, message: params.message, sha: existing?.sha, context }));
+    const saved = await retryNotFound(() => putFile({ path: file.path, content: file.content, contentBase64: file.contentBase64, message: params.message, sha: existing?.sha, context }));
     latestCommit = saved.commit;
   }
 

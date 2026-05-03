@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, ExternalLink, FileText, Gauge, Github, Image, LogOut, Menu, PanelTop, Rocket, ScrollText, Settings2, SlidersHorizontal } from 'lucide-react';
+import { Activity, ExternalLink, FileText, Gauge, Github, Image, LogOut, Menu, Palette, PanelTop, Rocket, ScrollText, Settings2, SlidersHorizontal } from 'lucide-react';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
 import { ThemeModeControl } from '@/components/layout/ThemeModeControl';
 
@@ -12,6 +12,7 @@ const nav = [
   { href: '/drafts', label: '草稿', icon: ScrollText },
   { href: '/pages', label: '页面', icon: PanelTop },
   { href: '/media', label: '图片', icon: Image },
+  { href: '/themes', label: '主题', icon: Palette },
   { href: '/publish', label: '发布', icon: Rocket },
   { href: '/versions', label: '版本', icon: Settings2 },
   { href: '/settings', label: '配置', icon: SlidersHorizontal },

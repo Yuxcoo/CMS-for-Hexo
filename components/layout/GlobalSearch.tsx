@@ -2,21 +2,22 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Image, Loader2, PanelTop, Search, ScrollText, X } from 'lucide-react';
+import { FileText, Image, Loader2, Palette, PanelTop, Search, ScrollText, X } from 'lucide-react';
 import { TextInput } from '@/components/ui/Field';
 
 type SearchItem = {
   href: string;
   title: string;
   description: string;
-  type: 'post' | 'draft' | 'page' | 'media';
+  type: 'post' | 'draft' | 'page' | 'media' | 'theme';
 };
 
 const typeMeta = {
   post: { label: '文章', icon: FileText },
   draft: { label: '草稿', icon: ScrollText },
   page: { label: '页面', icon: PanelTop },
-  media: { label: '图片', icon: Image }
+  media: { label: '图片', icon: Image },
+  theme: { label: '主题', icon: Palette }
 };
 
 function text(value: unknown) {
@@ -51,8 +52,9 @@ export function GlobalSearch() {
       fetch('/api/posts').then((response) => response.json()).catch(() => ({})),
       fetch('/api/drafts').then((response) => response.json()).catch(() => ({})),
       fetch('/api/pages').then((response) => response.json()).catch(() => ({})),
-      fetch('/api/media').then((response) => response.json()).catch(() => ({}))
-    ]).then(([postsData, draftsData, pagesData, mediaData]) => {
+      fetch('/api/media').then((response) => response.json()).catch(() => ({})),
+      fetch('/api/themes').then((response) => response.json()).catch(() => ({}))
+    ]).then(([postsData, draftsData, pagesData, mediaData, themesData]) => {
       if (cancelled) return;
       const next: SearchItem[] = [
         ...(postsData.posts || []).map((post: any) => ({
@@ -78,6 +80,12 @@ export function GlobalSearch() {
           href: '/media',
           title: text(media.name),
           description: text(media.path)
+        })),
+        ...(themesData.themes || []).map((theme: any) => ({
+          type: 'theme' as const,
+          href: '/themes',
+          title: text(theme.name),
+          description: text(theme.active ? '当前主题' : theme.path)
         }))
       ];
       setItems(next);
@@ -104,7 +112,7 @@ export function GlobalSearch() {
           <div className="mx-auto max-w-2xl overflow-hidden rounded-[14px] border border-line bg-canvas text-ink" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-center gap-3 border-b border-line p-3">
               <Search size={17} className="text-muted" />
-              <TextInput ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文章、草稿、页面、图片" className="min-h-9 flex-1 border-0 bg-transparent px-0 py-1 focus:ring-0" />
+              <TextInput ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文章、草稿、页面、图片、主题" className="min-h-9 flex-1 border-0 bg-transparent px-0 py-1 focus:ring-0" />
               <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-paper hover:text-ink">
                 <X size={16} />
               </button>
