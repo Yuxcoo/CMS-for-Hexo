@@ -110,10 +110,21 @@ function safeThemeName(name: string) {
 }
 
 function commonRoot(paths: string[]) {
-  const firstParts = paths[0]?.split('/') || [];
+  const firstParts = paths[0]?.split('/').filter(Boolean) || [];
   if (!firstParts.length) return '';
-  const root = firstParts[0];
-  return paths.every((path) => path.startsWith(`${root}/`)) ? root : '';
+  const shared: string[] = [];
+
+  for (let index = 0; index < firstParts.length; index += 1) {
+    const segment = firstParts[index];
+    if (paths.every((path) => path.split('/').filter(Boolean)[index] === segment)) {
+      shared.push(segment);
+      continue;
+    }
+    break;
+  }
+
+  if (shared[0] === 'themes' && shared[1]) return shared.slice(0, 2).join('/');
+  return shared.length === 1 ? shared[0] : '';
 }
 
 function stripThemeRoot(path: string, root: string) {

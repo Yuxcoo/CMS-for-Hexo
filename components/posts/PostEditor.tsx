@@ -175,8 +175,8 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
             <Field label="分类">
               <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} placeholder="逗号分隔" />
             </Field>
-            <Field label="摘要" className="md:col-span-2 xl:col-span-2">
-              <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-10" />
+            <Field label="摘要" className="md:col-span-2 xl:col-span-2 xl:row-span-2">
+              <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-[132px] xl:h-full xl:min-h-0" />
             </Field>
             <Field label="priority">
               <TextInput type="number" value={Number(meta.priority || 0)} onChange={(event) => updateMeta('priority', Number(event.target.value || 0))} />
