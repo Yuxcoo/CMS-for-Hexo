@@ -22,6 +22,20 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function retryNotFound<T>(operation: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isNotFound(error) || attempt === attempts - 1) throw error;
+      await sleep(500 * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
 async function githubFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const config = getConfig();
   const response = await fetch(`${apiBase}${path}`, {
@@ -121,58 +135,30 @@ export async function putFile(params: { path: string; content?: string; contentB
   });
 }
 
-async function getHeadRef(context: RepoContext) {
-  let branch = branchFor(context);
-  let lastError: unknown;
+async function resolveWritableContext(context: RepoContext): Promise<RepoContext> {
+  const repo = await retryNotFound(() => getRepository(context));
+  return { ...context, branch: repo.default_branch || branchFor(context) };
+}
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const refPath = `/git/ref/heads/${encodeURIComponent(branch)}`;
-      const ref = await githubFetch<{ object: { sha: string } }>(repoApiPathFor(context, refPath));
-      return { branch, refPath, ref };
-    } catch (error) {
-      lastError = error;
-      if (!isNotFound(error)) throw error;
-
-      const repo = await getRepository(context).catch(() => null);
-      if (repo?.default_branch && repo.default_branch !== branch) {
-        branch = repo.default_branch;
-      } else {
-        await sleep(750 * (attempt + 1));
-      }
-    }
-  }
-
-  throw lastError;
+export async function resolveRepositoryContext(context?: RepoContext): Promise<RepoContext> {
+  return resolveWritableContext(context || getRepoContext());
 }
 
 export async function putFiles(params: { files: Array<{ path: string; content: string }>; message: string; context?: RepoContext }) {
   if (!params.files.length) return null;
-  const context = params.context || getRepoContext();
-  const repoPath = (suffix: string) => repoApiPathFor(context, suffix);
-  const { refPath, ref } = await getHeadRef(context);
-  const baseCommit = await githubFetch<{ tree: { sha: string } }>(repoPath(`/git/commits/${ref.object.sha}`));
-  const tree = await githubFetch<{ sha: string }>(repoPath('/git/trees'), {
-    method: 'POST',
-    body: JSON.stringify({
-      base_tree: baseCommit.tree.sha,
-      tree: params.files.map((file) => ({
-        path: assertSafeRepoPath(file.path),
-        mode: '100644',
-        type: 'blob',
-        content: file.content
-      }))
-    })
-  });
-  const commit = await githubFetch<{ sha: string; html_url: string }>(repoPath('/git/commits'), {
-    method: 'POST',
-    body: JSON.stringify({ message: params.message, tree: tree.sha, parents: [ref.object.sha] })
-  });
-  await githubFetch(repoPath(refPath), {
-    method: 'PATCH',
-    body: JSON.stringify({ sha: commit.sha })
-  });
-  return { commit };
+  const context = await resolveWritableContext(params.context || getRepoContext());
+  let latestCommit: { sha: string; html_url: string } | null = null;
+
+  for (const file of params.files) {
+    const existing = await getFile(file.path, context).catch((error) => {
+      if (isNotFound(error)) return null;
+      throw error;
+    });
+    const saved = await retryNotFound(() => putFile({ path: file.path, content: file.content, message: params.message, sha: existing?.sha, context }));
+    latestCommit = saved.commit;
+  }
+
+  return latestCommit ? { commit: latestCommit } : null;
 }
 
 export async function deleteFile(params: { path: string; sha: string; message: string }) {

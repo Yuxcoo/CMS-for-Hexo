@@ -57,11 +57,12 @@ export function RepositoryClient() {
         setBusy(false);
         return;
       }
-      setMessage(`已连接：${repo.fullName}，正在进入仪表盘...`);
       if (pathname === '/onboarding') {
+        setMessage(`已连接：${repo.fullName}，正在进入仪表盘...`);
         window.location.assign('/dashboard');
         return;
       }
+      setMessage(`已连接：${repo.fullName}`);
       setBusy(false);
     } catch {
       setMessage('连接失败，请稍后重试');
@@ -84,11 +85,12 @@ export function RepositoryClient() {
         setBusy(false);
         return;
       }
-      setMessage(`已创建并初始化：${result.repo.full_name}，正在进入仪表盘...`);
       if (pathname === '/onboarding') {
+        setMessage(`已创建并初始化：${result.repo.full_name}，正在进入仪表盘...`);
         window.location.assign('/dashboard');
         return;
       }
+      setMessage(`已创建并初始化：${result.repo.full_name}`);
       setBusy(false);
       load();
     } catch {

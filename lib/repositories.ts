@@ -1,5 +1,5 @@
 import { getConfig } from './config';
-import { createRepository, fileExists, getAuthenticatedUser, getFile, listAccessibleRepos, putFiles } from './github';
+import { createRepository, fileExists, getAuthenticatedUser, getFile, listAccessibleRepos, putFiles, resolveRepositoryContext } from './github';
 import { getRepoContext, setRepoContext, type RepoContext } from './repo-context';
 
 const starterPackageJson = {
@@ -254,7 +254,8 @@ export async function createHexoRepository(params: { name: string; description?:
 
 export async function initializeHexoRepository(context?: RepoContext) {
   const config = getConfig();
-  const target = context || getRepoContext();
+  const target = await resolveRepositoryContext(context || getRepoContext());
+  setRepoContext(target);
   const now = new Date().toISOString();
   const files: StarterFile[] = [
     { path: 'package.json', content: `${JSON.stringify(starterPackageJson, null, 2)}\n`, overwrite: true, merge: mergePackageJson },
