@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, FilePenLine, Save, Trash2, UploadCloud } from 'lucide-react';
+import { ChevronDown, ChevronUp, FilePenLine, GripVertical, Pin, PinOff, Save, Trash2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextArea, TextInput } from '@/components/ui/Field';
 import { renderMarkdownPreview } from '@/lib/markdown-preview';
@@ -19,7 +19,9 @@ const emptyMeta: PostMeta = {
   date: new Date().toISOString(),
   tags: [],
   categories: [],
-  permalink: ''
+  permalink: '',
+  priority: 0,
+  sticky: false
 };
 
 function arrayToText(value: string[]) {
@@ -33,6 +35,8 @@ function textToArray(value: string) {
 function cleanMeta(meta: PostMeta): PostMeta {
   const next = { ...meta };
   if (!String(next.permalink || '').trim()) delete next.permalink;
+  if (!Number.isFinite(Number(next.priority))) delete next.priority;
+  if (!next.sticky) delete next.sticky;
   return next;
 }
 
@@ -48,7 +52,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
 
   useEffect(() => {
     if (!initial) return;
-    setMeta({ ...initial.meta, permalink: String(initial.meta.permalink || '') });
+    setMeta({ ...initial.meta, permalink: String(initial.meta.permalink || ''), priority: Number(initial.meta.priority || 0), sticky: Boolean(initial.meta.sticky) });
     setBody(initial.body);
     setPath(initial.path);
     setSha(initial.sha);
@@ -136,7 +140,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
             <h2 className="truncate font-display text-[22px] font-semibold leading-[1.18] tracking-[-0.2px] text-ink">{meta.title || '未命名文章'}</h2>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] leading-[1.3] tracking-[-0.12px] text-muted">
               <span>仓库：{path || '自动生成'}</span>
-              <span>访问：{meta.permalink || '按 Hexo 默认规则'}</span>
+              <span>permalink：{meta.permalink || '按 Hexo 默认规则'}</span>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -159,21 +163,31 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
             <Field label="仓库路径">
               <TextInput value={path} onChange={(event) => setPath(event.target.value)} placeholder={kind === 'post' ? 'source/_posts/my-post.md' : 'source/_drafts/my-draft.md'} />
             </Field>
-            <Field label="Hexo 访问路径">
+            <Field label="permalink">
               <TextInput value={String(meta.permalink || '')} onChange={(event) => updateMeta('permalink', event.target.value)} placeholder="posts/my-custom-url/" />
             </Field>
             <Field label="发布日期">
               <TextInput value={meta.date || ''} onChange={(event) => updateMeta('date', event.target.value)} placeholder="2026-05-01T10:00:00.000Z" />
             </Field>
-            <Field label="标签，逗号分隔">
-              <TextInput value={arrayToText(meta.tags)} onChange={(event) => updateMeta('tags', textToArray(event.target.value))} />
+            <Field label="标签">
+              <TextInput value={arrayToText(meta.tags)} onChange={(event) => updateMeta('tags', textToArray(event.target.value))} placeholder="逗号分隔" />
             </Field>
-            <Field label="分类，逗号分隔">
-              <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} />
+            <Field label="分类">
+              <TextInput value={arrayToText(meta.categories)} onChange={(event) => updateMeta('categories', textToArray(event.target.value))} placeholder="逗号分隔" />
             </Field>
-            <Field label="摘要">
-              <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-10 md:col-span-2" />
+            <Field label="摘要" className="md:col-span-2 xl:col-span-2">
+              <TextArea value={String(meta.excerpt || '')} onChange={(event) => updateMeta('excerpt', event.target.value)} className="min-h-10" />
             </Field>
+            <Field label="priority">
+              <TextInput type="number" value={Number(meta.priority || 0)} onChange={(event) => updateMeta('priority', Number(event.target.value || 0))} />
+            </Field>
+            <label className="grid gap-1 text-[13px] font-semibold leading-[1.3] tracking-[-0.12px] text-ink">
+              <span>置顶</span>
+              <button type="button" onClick={() => updateMeta('sticky', !meta.sticky)} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[14px] font-normal transition active:scale-95 ${meta.sticky ? 'border-blue bg-blue text-white' : 'border-line bg-canvas text-ink hover:border-blue'}`}>
+                {meta.sticky ? <Pin size={15} /> : <PinOff size={15} />}
+                {meta.sticky ? '已置顶' : '未置顶'}
+              </button>
+            </label>
           </div>
         ) : null}
         {message ? <p className="mx-4 mb-4 apple-message break-all">{message}</p> : null}
@@ -186,9 +200,21 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   );
 }
 
-export function PostList({ posts, activePath, onSelect }: { posts: PostSummary[]; activePath?: string; onSelect: (post: PostSummary) => void }) {
+export function PostList({ posts, activePath, kind, onSelect, onReorder, onOrderMeta }: { posts: PostSummary[]; activePath?: string; kind: PostKind; onSelect: (post: PostSummary) => void; onReorder: (paths: string[]) => void; onOrderMeta: (post: PostSummary, meta: { priority?: number; sticky?: boolean; save?: boolean }) => void }) {
   const [query, setQuery] = useState('');
+  const [dragPath, setDragPath] = useState<string | null>(null);
   const filtered = posts.filter((post) => `${post.meta.title} ${post.path} ${post.meta.permalink || ''} ${post.meta.tags.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
+
+  function moveBefore(targetPath: string) {
+    if (!dragPath || dragPath === targetPath || query.trim()) return;
+    const next = posts.filter((post) => post.path !== dragPath);
+    const targetIndex = next.findIndex((post) => post.path === targetPath);
+    const dragged = posts.find((post) => post.path === dragPath);
+    if (!dragged || targetIndex < 0) return;
+    next.splice(targetIndex, 0, dragged);
+    onReorder(next.map((post) => post.path));
+  }
+
   return (
     <aside className="apple-panel overflow-hidden xl:sticky xl:top-[104px]">
       <div className="border-b border-line p-3">
@@ -196,10 +222,34 @@ export function PostList({ posts, activePath, onSelect }: { posts: PostSummary[]
       </div>
       <div className="max-h-[calc(100vh-190px)] overflow-auto p-2">
         {filtered.map((post) => (
-          <button key={post.path} onClick={() => onSelect(post)} className={`mb-2 block w-full rounded-[10px] border p-3 text-left transition hover:border-blue ${activePath === post.path ? 'border-blue bg-paper' : 'border-transparent hover:bg-paper'}`}>
-            <div className="text-[15px] font-semibold leading-[1.25] tracking-[-0.18px] text-ink">{post.meta.title}</div>
-            <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{post.meta.permalink || post.path}</div>
-          </button>
+          <div key={post.path} draggable={!query.trim()} onDragStart={() => setDragPath(post.path)} onDragOver={(event) => event.preventDefault()} onDrop={() => moveBefore(post.path)} onDragEnd={() => setDragPath(null)} className={`mb-2 rounded-[10px] border p-2 transition hover:border-blue ${activePath === post.path ? 'border-blue bg-paper' : dragPath === post.path ? 'border-blue/50 bg-paper/70 opacity-70' : 'border-transparent hover:bg-paper'}`}>
+            <div className="flex items-start gap-2">
+              <button type="button" className="mt-0.5 grid h-7 w-7 shrink-0 cursor-grab place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink" aria-label="拖动排序">
+                <GripVertical size={15} />
+              </button>
+              <button type="button" onClick={() => onSelect(post)} className="min-w-0 flex-1 text-left">
+                <div className="flex items-center gap-1.5">
+                  {post.meta.sticky ? <Pin size={13} className="shrink-0 text-blue" /> : null}
+                  <span className="truncate text-[15px] font-semibold leading-[1.25] tracking-[-0.18px] text-ink">{post.meta.title}</span>
+                </div>
+                <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{post.meta.permalink || post.path}</div>
+              </button>
+            </div>
+            <div className="mt-2 flex items-center gap-2 pl-9">
+              <input type="number" value={Number(post.meta.priority || 0)} onChange={(event) => {
+                const priority = Number(event.target.value || 0);
+                onOrderMeta(post, { priority, save: false });
+              }} onBlur={(event) => onOrderMeta(post, { priority: Number(event.target.value || 0), save: true })} onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+              }} className="h-8 w-20 rounded-full border border-line bg-canvas px-3 text-[12px] text-ink outline-none focus:border-blueFocus focus:ring-2 focus:ring-blueFocus/20" aria-label="priority" />
+              {kind === 'post' ? (
+                <button type="button" onClick={() => onOrderMeta(post, { sticky: !post.meta.sticky })} className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] transition ${post.meta.sticky ? 'border-blue bg-blue text-white' : 'border-line bg-canvas text-muted hover:border-blue hover:text-ink'}`}>
+                  {post.meta.sticky ? <Pin size={13} /> : <PinOff size={13} />}
+                  置顶
+                </button>
+              ) : null}
+            </div>
+          </div>
         ))}
       </div>
     </aside>

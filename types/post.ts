@@ -11,6 +11,7 @@ export type PostMeta = {
   excerpt?: string;
   cover?: string;
   permalink?: string;
+  priority?: number;
   sticky?: number | boolean;
   [key: string]: FrontMatterValue;
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Save } from 'lucide-react';
+import { GripVertical, Plus, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextArea, TextInput } from '@/components/ui/Field';
 
@@ -11,6 +11,7 @@ type PageSummary = {
   path: string;
   url: string;
   sha: string;
+  priority?: number;
 };
 
 type PageDetail = PageSummary & { body: string };
@@ -22,6 +23,7 @@ export function PagesClient() {
   const [active, setActive] = useState<PageDetail>(emptyPage);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [dragPath, setDragPath] = useState<string | null>(null);
 
   async function loadList() {
     setBusy(true);
@@ -65,7 +67,7 @@ export function PagesClient() {
       const response = await fetch('/api/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: active.title, slug: active.slug, menuLabel: active.title, body: active.body, path: active.path || undefined, sha: active.sha || undefined })
+        body: JSON.stringify({ title: active.title, slug: active.slug, menuLabel: active.title, body: active.body, path: active.path || undefined, sha: active.sha || undefined, priority: active.priority || 0 })
       });
       const result = await response.json();
       setBusy(false);
@@ -79,6 +81,44 @@ export function PagesClient() {
     } catch {
       setBusy(false);
       setMessage('保存失败，请稍后重试');
+    }
+  }
+
+  async function reorder(targetPath: string) {
+    if (!dragPath || dragPath === targetPath) return;
+    const next = pages.filter((page) => page.path !== dragPath);
+    const targetIndex = next.findIndex((page) => page.path === targetPath);
+    const dragged = pages.find((page) => page.path === dragPath);
+    if (!dragged || targetIndex < 0) return;
+    next.splice(targetIndex, 0, dragged);
+    const prioritized = next.map((page, index) => ({ ...page, priority: (next.length - index) * 10 }));
+    setPages(prioritized);
+    if (active.path) {
+      const nextActive = prioritized.find((page) => page.path === active.path);
+      if (nextActive) setActive((current) => ({ ...current, priority: nextActive.priority }));
+    }
+    const response = await fetch('/api/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reorder', paths: prioritized.map((page) => page.path) })
+    });
+    if (!response.ok) {
+      setMessage('排序保存失败，已重新加载页面列表');
+      loadList();
+    }
+  }
+
+  async function savePriority(page: PageSummary, priority: number) {
+    setPages((current) => current.map((item) => item.path === page.path ? { ...item, priority } : item));
+    if (active.path === page.path) setActive((current) => ({ ...current, priority }));
+    const response = await fetch('/api/pages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'priority', path: page.path, priority })
+    });
+    if (!response.ok) {
+      setMessage('priority 保存失败，已重新加载页面列表');
+      loadList();
     }
   }
 
@@ -96,10 +136,26 @@ export function PagesClient() {
         <div className="max-h-[620px] overflow-auto p-3">
           {!pages.length ? <p className="apple-message text-muted">还没有独立页面。</p> : null}
           {pages.map((page) => (
-            <button key={page.path} onClick={() => select(page)} className={`mb-2 block w-full rounded-[11px] border p-4 text-left transition hover:border-blue ${active.path === page.path ? 'border-blue bg-paper' : 'border-transparent hover:bg-paper'}`}>
-              <div className="text-[15px] font-semibold leading-[1.24] tracking-[-0.18px] text-ink">{page.title}</div>
-              <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{page.url}</div>
-            </button>
+            <div key={page.path} draggable onDragStart={() => setDragPath(page.path)} onDragOver={(event) => event.preventDefault()} onDrop={() => reorder(page.path)} onDragEnd={() => setDragPath(null)} className={`mb-2 rounded-[11px] border p-3 transition hover:border-blue ${active.path === page.path ? 'border-blue bg-paper' : dragPath === page.path ? 'border-blue/50 bg-paper/70 opacity-70' : 'border-transparent hover:bg-paper'}`}>
+              <div className="flex items-start gap-2">
+                <button type="button" className="mt-0.5 grid h-7 w-7 shrink-0 cursor-grab place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink" aria-label="拖动排序">
+                  <GripVertical size={15} />
+                </button>
+                <button type="button" onClick={() => select(page)} className="min-w-0 flex-1 text-left">
+                  <div className="text-[15px] font-semibold leading-[1.24] tracking-[-0.18px] text-ink">{page.title}</div>
+                  <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{page.url}</div>
+                </button>
+              </div>
+              <div className="mt-2 pl-9">
+                <input type="number" value={Number(page.priority || 0)} onChange={(event) => {
+                  const priority = Number(event.target.value || 0);
+                  setPages((current) => current.map((item) => item.path === page.path ? { ...item, priority } : item));
+                  if (active.path === page.path) setActive((current) => ({ ...current, priority }));
+                }} onBlur={(event) => savePriority(page, Number(event.target.value || 0))} onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                }} className="h-8 w-24 rounded-full border border-line bg-canvas px-3 text-[12px] text-ink outline-none focus:border-blueFocus focus:ring-2 focus:ring-blueFocus/20" aria-label="priority" />
+              </div>
+            </div>
           ))}
         </div>
       </aside>
@@ -110,6 +166,9 @@ export function PagesClient() {
           </Field>
           <Field label="页面路径">
             <TextInput value={active.slug} onChange={(event) => setActive((current) => ({ ...current, slug: event.target.value }))} placeholder="about" disabled={Boolean(active.path)} />
+          </Field>
+          <Field label="priority">
+            <TextInput type="number" value={Number(active.priority || 0)} onChange={(event) => setActive((current) => ({ ...current, priority: Number(event.target.value || 0) }))} />
           </Field>
         </div>
         <Field label="页面正文 Markdown">

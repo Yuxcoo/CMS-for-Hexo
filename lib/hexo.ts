@@ -16,6 +16,28 @@ function normalizeArray(value: unknown): string[] {
   return [];
 }
 
+function normalizeNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function stickyWeight(value: PostMeta['sticky']) {
+  if (typeof value === 'number') return value;
+  return value ? 1 : 0;
+}
+
+function comparePosts(a: PostSummary, b: PostSummary) {
+  const sticky = stickyWeight(b.meta.sticky) - stickyWeight(a.meta.sticky);
+  if (sticky !== 0) return sticky;
+  const priority = (b.meta.priority || 0) - (a.meta.priority || 0);
+  if (priority !== 0) return priority;
+  return String(b.meta.date || '').localeCompare(String(a.meta.date || ''));
+}
+
 export function parseMarkdown(raw: string): { meta: PostMeta; body: string } {
   const parsed = matter(raw);
   const data = parsed.data || {};
@@ -25,6 +47,7 @@ export function parseMarkdown(raw: string): { meta: PostMeta; body: string } {
       title: String(data.title || 'Untitled'),
       date: data.date ? String(data.date) : undefined,
       updated: data.updated ? String(data.updated) : undefined,
+      priority: normalizeNumber(data.priority),
       tags: normalizeArray(data.tags),
       categories: normalizeArray(data.categories)
     },
@@ -58,7 +81,7 @@ export async function listPosts(kind: PostKind): Promise<PostSummary[]> {
       } satisfies PostSummary;
     })
   );
-  return summaries.sort((a, b) => String(b.meta.date || '').localeCompare(String(a.meta.date || '')));
+  return summaries.sort(comparePosts);
 }
 
 export async function getPost(path: string, kind: PostKind): Promise<PostContent> {
@@ -107,4 +130,33 @@ export async function movePost(path: string, from: PostKind, to: PostKind) {
   });
   await deleteFile({ path: post.path, sha: post.sha, message: `Remove ${from}: ${post.meta.title}` });
   return { path: targetPath, sha: saved.content.sha, commit: saved.commit };
+}
+
+export async function reorderPosts(kind: PostKind, orderedPaths: string[]) {
+  const uniquePaths = Array.from(new Set(orderedPaths));
+  const posts = await Promise.all(uniquePaths.map((path) => getPost(path, kind)));
+  await Promise.all(posts.map((post, index) => {
+    const priority = (posts.length - index) * 10;
+    return putFile({
+      path: post.path,
+      sha: post.sha,
+      content: stringifyMarkdown({ ...post.meta, priority }, post.body),
+      message: `Update ${kind} priority: ${post.meta.title}`
+    });
+  }));
+  return { updated: posts.map((post, index) => ({ path: post.path, priority: (posts.length - index) * 10 })) };
+}
+
+export async function updatePostOrderMeta(input: { path: string; kind: PostKind; priority?: number; sticky?: boolean | number }) {
+  const post = await getPost(input.path, input.kind);
+  const meta = { ...post.meta };
+  if (typeof input.priority === 'number' && Number.isFinite(input.priority)) meta.priority = input.priority;
+  if (typeof input.sticky !== 'undefined') meta.sticky = input.sticky;
+  const saved = await putFile({
+    path: post.path,
+    sha: post.sha,
+    content: stringifyMarkdown(meta, post.body),
+    message: `Update ${input.kind} order: ${post.meta.title}`
+  });
+  return { path: post.path, sha: saved.content.sha, commit: saved.commit, meta };
 }
