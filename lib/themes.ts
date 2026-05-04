@@ -1,5 +1,5 @@
 import YAML from 'yaml';
-import { inflateRawSync } from 'zlib';
+import { gunzipSync, inflateRawSync } from 'zlib';
 import { deleteFile, getFile, getFileBase64, listDirectory, putFile, putFiles } from './github';
 import { assertSafeRepoPath, isInsideDir, joinRepoPath, normalizeRepoPath, slugify } from './paths';
 import type { GitHubFile } from '@/types/github';
@@ -26,6 +26,19 @@ type InstallThemeInput = {
   activate?: boolean;
   archiveBase64?: string;
   files?: Array<{ path: string; contentBase64: string }>;
+};
+
+export type NpmThemeSearchItem = {
+  packageName: string;
+  themeName: string;
+  version: string;
+  description?: string;
+  date?: string;
+  links?: {
+    npm?: string;
+    homepage?: string;
+    repository?: string;
+  };
 };
 
 const maxThemeArchiveBytes = 30 * 1024 * 1024;
@@ -56,6 +69,10 @@ function findEndOfCentralDirectory(buffer: Buffer) {
 
 function normalizeZipEntryPath(path: string) {
   return normalizeRepoPath(path.replace(/^\/+/, '')).replace(/^\.\//, '');
+}
+
+function stripNulls(value: string) {
+  return value.replace(/\0.*$/, '').trim();
 }
 
 function isEditableThemePath(path: string) {
@@ -106,6 +123,41 @@ function extractZipFiles(archiveBase64: string): Array<{ path: string; contentBa
   }
 
   if (!files.length) throw new Error('主题包没有可安装文件');
+  return files;
+}
+
+function readTarOctal(buffer: Buffer, start: number, length: number) {
+  const raw = stripNulls(buffer.subarray(start, start + length).toString('utf8')).replace(/\s+$/g, '');
+  return raw ? parseInt(raw, 8) : 0;
+}
+
+function extractTarFiles(archive: Buffer): Array<{ path: string; contentBase64: string }> {
+  const files: Array<{ path: string; contentBase64: string }> = [];
+  let offset = 0;
+
+  while (offset + 512 <= archive.length) {
+    const header = archive.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) break;
+
+    const name = stripNulls(header.subarray(0, 100).toString('utf8'));
+    const prefix = stripNulls(header.subarray(345, 500).toString('utf8'));
+    const typeFlag = stripNulls(header.subarray(156, 157).toString('utf8')) || '0';
+    const size = readTarOctal(header, 124, 12);
+    const fullName = normalizeZipEntryPath(prefix ? `${prefix}/${name}` : name);
+    offset += 512;
+
+    const data = archive.subarray(offset, offset + size);
+    const paddedSize = Math.ceil(size / 512) * 512;
+    offset += paddedSize;
+
+    if (!fullName || fullName.endsWith('/') || typeFlag === '5') continue;
+    if (typeFlag !== '0' && typeFlag !== '') continue;
+    if (fullName.startsWith('__MACOSX/') || fullName.endsWith('.DS_Store')) continue;
+    assertSafeRepoPath(fullName);
+    files.push({ path: fullName, contentBase64: data.toString('base64') });
+  }
+
+  if (!files.length) throw new Error('npm 主题包没有可安装文件');
   return files;
 }
 
@@ -178,6 +230,28 @@ async function ensureThemeSupportPackages() {
   });
 }
 
+async function ensureThemePackageDependency(packageName: string, version: string) {
+  const current = await optionalFile('package.json');
+  const parsed = JSON.parse(current?.content || '{}') as {
+    dependencies?: Record<string, string>;
+    [key: string]: unknown;
+  };
+  const dependencies = { ...(parsed.dependencies || {}), [packageName]: `^${version}` };
+  const nextContent = `${JSON.stringify({ ...parsed, dependencies }, null, 2)}\n`;
+  if (current?.content === nextContent) return null;
+  return putFile({
+    path: 'package.json',
+    content: nextContent,
+    sha: current?.sha,
+    message: `Add Hexo theme dependency: ${packageName}@${version}`
+  });
+}
+
+function themeNameFromPackageName(packageName: string) {
+  const normalized = packageName.replace(/^@[^/]+\//, '').replace(/^hexo-theme-/, '');
+  return safeThemeName(normalized || packageName);
+}
+
 export async function listThemes(): Promise<{ activeTheme: string; themes: ThemeSummary[] }> {
   const activeTheme = await activeThemeName();
   const entries = await listDirectory('themes').catch((error) => {
@@ -225,6 +299,73 @@ export async function installTheme(input: InstallThemeInput) {
   await ensureThemeSupportPackages();
   const activation = input.activate === false ? null : await activateTheme(themeName);
   return { theme: themeName, installed: files.length, activated: Boolean(activation), commit: activation?.commit };
+}
+
+export async function searchNpmThemes(query: string): Promise<{ items: NpmThemeSearchItem[] }> {
+  const text = `${query.trim() || 'hexo-theme'} keywords:hexo-theme`;
+  const response = await fetch(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(text)}&size=10`, {
+    headers: { Accept: 'application/json' },
+    next: { revalidate: 60 * 30 }
+  });
+  if (!response.ok) throw new Error('搜索 npm 主题失败');
+  const result = await response.json() as {
+    objects?: Array<{
+      package: {
+        name: string;
+        version: string;
+        description?: string;
+        date?: string;
+        links?: { npm?: string; homepage?: string; repository?: string };
+      };
+    }>;
+  };
+  const items = (result.objects || [])
+    .map((entry) => entry.package)
+    .filter((pkg) => pkg.name.includes('hexo-theme'))
+    .map((pkg) => ({
+      packageName: pkg.name,
+      themeName: themeNameFromPackageName(pkg.name),
+      version: pkg.version,
+      description: pkg.description,
+      date: pkg.date,
+      links: pkg.links
+    }));
+  return { items };
+}
+
+export async function installNpmTheme(input: { packageName: string; version?: string; activate?: boolean }) {
+  const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(input.packageName).replace('%40', '@')}`, {
+    headers: { Accept: 'application/json' },
+    next: { revalidate: 60 * 30 }
+  });
+  if (!response.ok) throw new Error(`读取 npm 主题信息失败：${input.packageName}`);
+  const metadata = await response.json() as {
+    'dist-tags'?: { latest?: string };
+    versions?: Record<string, { dist?: { tarball?: string }; name?: string; version?: string; hexo?: { theme?: string } }>;
+  };
+  const version = input.version || metadata['dist-tags']?.latest;
+  if (!version) throw new Error(`无法确定 ${input.packageName} 的版本`);
+  const release = metadata.versions?.[version];
+  const tarball = release?.dist?.tarball;
+  if (!tarball) throw new Error(`找不到 ${input.packageName}@${version} 的 tarball`);
+
+  const archiveResponse = await fetch(tarball, { next: { revalidate: 60 * 30 } });
+  if (!archiveResponse.ok) throw new Error(`下载 ${input.packageName}@${version} 失败`);
+  const tgzBuffer = Buffer.from(await archiveResponse.arrayBuffer());
+  const tarBuffer = gunzipSync(tgzBuffer);
+  const files = extractTarFiles(tarBuffer);
+  const packageRoot = commonRoot(files.map((file) => file.path));
+  const preferredThemeName = release?.hexo?.theme || themeNameFromPackageName(input.packageName);
+  const installResult = await installTheme({
+    name: preferredThemeName,
+    activate: input.activate,
+    files: files.map((file) => ({
+      path: stripThemeRoot(file.path, packageRoot),
+      contentBase64: file.contentBase64
+    }))
+  });
+  await ensureThemePackageDependency(input.packageName, version);
+  return { ...installResult, packageName: input.packageName, version };
 }
 
 export async function listThemeFiles(theme: string, dir = ''): Promise<{ theme: string; path: string; files: ThemeFileSummary[] }> {

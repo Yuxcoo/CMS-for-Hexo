@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, FileCode2, Folder, Loader2, Palette, Pencil, Save, Trash2, UploadCloud } from 'lucide-react';
+import { Check, Download, FileCode2, Folder, Loader2, Palette, Pencil, Save, Search, Trash2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextArea, TextInput } from '@/components/ui/Field';
 
@@ -27,6 +27,19 @@ type EditableFile = {
   sha: string;
   size: number;
   content: string;
+};
+
+type NpmThemeResult = {
+  packageName: string;
+  themeName: string;
+  version: string;
+  description?: string;
+  date?: string;
+  links?: {
+    npm?: string;
+    homepage?: string;
+    repository?: string;
+  };
 };
 
 function fileToBase64(file: File) {
@@ -56,10 +69,13 @@ export function ThemesClient() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [renameValue, setRenameValue] = useState('');
+  const [npmQuery, setNpmQuery] = useState('');
+  const [npmResults, setNpmResults] = useState<NpmThemeResult[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const selected = useMemo(() => themes.find((theme) => theme.name === selectedTheme), [selectedTheme, themes]);
 
-  const loadThemes = useCallback(async () => {
+  const loadThemes = useCallback(async (preferredTheme?: string) => {
     const response = await fetch('/api/themes');
     const result = await response.json();
     if (!response.ok) {
@@ -68,11 +84,13 @@ export function ThemesClient() {
     }
     setThemes(result.themes || []);
     setActiveTheme(result.activeTheme || '');
-    const nextSelected = selectedTheme && result.themes?.some((theme: ThemeSummary) => theme.name === selectedTheme)
-      ? selectedTheme
+    const nextSelected = preferredTheme && result.themes?.some((theme: ThemeSummary) => theme.name === preferredTheme)
+      ? preferredTheme
+      : selectedTheme && result.themes?.some((theme: ThemeSummary) => theme.name === selectedTheme)
+        ? selectedTheme
       : result.activeTheme || result.themes?.[0]?.name || '';
     setSelectedTheme(nextSelected);
-    setRenameValue((current) => current || nextSelected);
+    setRenameValue(nextSelected);
   }, [selectedTheme]);
 
   const loadFiles = useCallback(async (theme: string, dir: string) => {
@@ -95,6 +113,7 @@ export function ThemesClient() {
 
   async function activate(name: string) {
     setBusy(true);
+    setMessage(`正在启用主题：${name}...`);
     const response = await fetch('/api/themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -107,12 +126,13 @@ export function ThemesClient() {
       return;
     }
     setMessage(`已启用主题：${result.theme}`);
-    await loadThemes();
+    await loadThemes(result.theme);
   }
 
   async function renameTheme() {
     if (!selectedTheme || !renameValue.trim() || renameValue.trim() === selectedTheme) return;
     setBusy(true);
+    setMessage(`正在重命名主题：${selectedTheme} -> ${renameValue.trim()}...`);
     const response = await fetch('/api/themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -124,16 +144,16 @@ export function ThemesClient() {
       setMessage(result.error || '重命名主题失败');
       return;
     }
-    setSelectedTheme(result.theme);
-    setRenameValue(result.theme);
     setMessage(`已重命名主题：${selectedTheme} -> ${result.theme}`);
-    await loadThemes();
+    setEditing(null);
+    await loadThemes(result.theme);
     await loadFiles(result.theme, '');
   }
 
   async function deleteTheme() {
     if (!selectedTheme || selectedTheme === activeTheme || !confirm(`确认删除主题 ${selectedTheme}？`)) return;
     setBusy(true);
+    setMessage(`正在删除主题：${selectedTheme}...`);
     const response = await fetch('/api/themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -181,6 +201,38 @@ export function ThemesClient() {
       setBusy(false);
       setMessage(error instanceof Error ? error.message : '安装主题失败');
     }
+  }
+
+  async function searchNpmThemes() {
+    setSearching(true);
+    const response = await fetch(`/api/themes?search=${encodeURIComponent(npmQuery.trim() || 'hexo-theme')}`);
+    const result = await response.json();
+    setSearching(false);
+    if (!response.ok) {
+      setMessage(result.error || '搜索 npm 主题失败');
+      return;
+    }
+    setNpmResults(result.items || []);
+    if (!(result.items || []).length) setMessage('没有找到可直接通过 npm 安装的 Hexo 主题');
+  }
+
+  async function installNpmTheme(item: NpmThemeResult) {
+    setBusy(true);
+    setMessage(`正在安装 npm 主题：${item.packageName}@${item.version}...`);
+    const response = await fetch('/api/themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'install-npm', packageName: item.packageName, version: item.version, activate: true })
+    });
+    const result = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setMessage(result.error || 'npm 主题安装失败');
+      return;
+    }
+    setMessage(`已安装 npm 主题：${result.packageName}@${result.version}，并启用为 ${result.theme}`);
+    await loadThemes(result.theme);
+    await loadFiles(result.theme, '');
   }
 
   async function openFile(file: ThemeFile) {
@@ -283,6 +335,36 @@ export function ThemesClient() {
               <UploadCloud size={17} />选择主题包
               <input className="hidden" type="file" accept=".zip,application/zip" disabled={busy} onChange={(event) => event.target.files?.[0] && install(event.target.files[0])} />
             </label>
+          </div>
+        </section>
+        <section className="apple-panel p-4">
+          <div className="grid gap-3">
+            <div>
+              <h3 className="font-display text-[20px] font-semibold leading-[1.16] tracking-[-0.18px] text-ink">搜索 npm 主题</h3>
+              <p className="mt-1 text-[13px] leading-[1.35] tracking-[-0.12px] text-muted">适合可通过 npm 发布的主题，安装后会同步写入 `package.json`，更利于后续版本管理。</p>
+            </div>
+            <div className="flex gap-2">
+              <TextInput value={npmQuery} onChange={(event) => setNpmQuery(event.target.value)} placeholder="例如 butterfly、next、hexo-theme" />
+              <Button variant="secondary" onClick={searchNpmThemes} disabled={searching}>
+                <Search size={16} />{searching ? '搜索中...' : '搜索'}
+              </Button>
+            </div>
+            <div className="grid gap-2">
+              {npmResults.map((item) => (
+                <div key={item.packageName} className="rounded-[12px] border border-line bg-paper/70 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[15px] font-semibold leading-[1.24] tracking-[-0.18px] text-ink">{item.themeName}</div>
+                      <div className="mt-1 truncate text-[12px] leading-none tracking-[-0.12px] text-muted">{item.packageName} · {item.version}</div>
+                      {item.description ? <div className="mt-2 text-[13px] leading-[1.4] tracking-[-0.12px] text-muted">{item.description}</div> : null}
+                    </div>
+                    <Button className="shrink-0" onClick={() => installNpmTheme(item)} disabled={busy}>
+                      <Download size={16} />安装
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </aside>
