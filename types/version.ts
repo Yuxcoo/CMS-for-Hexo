@@ -5,6 +5,8 @@ export type DependencyVersion = {
   latest?: string;
   source: 'dependencies' | 'devDependencies' | 'theme' | 'plugin';
   updateHint: 'unknown' | 'ok' | 'maybe-outdated';
+  canUpgrade?: boolean;
+  packageName?: string;
 };
 
 export type VersionReport = {

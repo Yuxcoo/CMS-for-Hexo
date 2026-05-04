@@ -1,9 +1,9 @@
 import YAML from 'yaml';
-import { getFile, listDirectory } from './github';
+import { getFile, listDirectory, putFile } from './github';
 import type { DependencyVersion, VersionReport } from '@/types/version';
 
-function versionItem(name: string, current: string, source: DependencyVersion['source']): DependencyVersion {
-  return { name, current, source, updateHint: 'unknown' };
+function versionItem(name: string, current: string, source: DependencyVersion['source'], packageName?: string): DependencyVersion {
+  return { name, current, source, updateHint: 'unknown', packageName: packageName || name };
 }
 
 async function getLatestVersion(name: string): Promise<string | undefined> {
@@ -33,7 +33,8 @@ async function enrichLatest(deps: DependencyVersion[]): Promise<DependencyVersio
       return {
         ...dep,
         latest,
-        updateHint: cleanVersion(dep.current) === latest ? 'ok' : 'maybe-outdated'
+        updateHint: cleanVersion(dep.current) === latest ? 'ok' : 'maybe-outdated',
+        canUpgrade: dep.source === 'dependencies' || dep.source === 'devDependencies' || (dep.source === 'theme' && dep.packageName?.startsWith('hexo-theme-'))
       };
     })
   );
@@ -54,7 +55,7 @@ function collectDeps(packageJson: Record<string, unknown>): DependencyVersion[] 
   const devDeps = (packageJson.devDependencies || {}) as Record<string, string>;
   const all: DependencyVersion[] = [];
   for (const [name, current] of Object.entries(deps)) {
-    if (name === 'hexo' || name.startsWith('hexo-')) all.push(versionItem(name, current, name.startsWith('hexo-theme-') ? 'theme' : 'dependencies'));
+      if (name === 'hexo' || name.startsWith('hexo-')) all.push(versionItem(name, current, name.startsWith('hexo-theme-') ? 'theme' : 'dependencies'));
   }
   for (const [name, current] of Object.entries(devDeps)) {
     if (name === 'hexo' || name.startsWith('hexo-')) all.push(versionItem(name, current, name.startsWith('hexo-theme-') ? 'theme' : 'devDependencies'));
@@ -78,9 +79,9 @@ async function detectThemeVersion(themeName?: string): Promise<DependencyVersion
   try {
     const file = await getFile(packagePath);
     const parsed = JSON.parse(file.content) as { name?: string; version?: string };
-    return versionItem(parsed.name || themeName, parsed.version || 'unknown', 'theme');
+    return versionItem(themeName, parsed.version || 'unknown', 'theme', parsed.name || themeName);
   } catch {
-    return versionItem(themeName, 'theme folder or package.json not found', 'theme');
+    return versionItem(themeName, 'theme folder or package.json not found', 'theme', themeName);
   }
 }
 
@@ -103,15 +104,46 @@ export async function getVersionReport(): Promise<VersionReport> {
   const plugins = await enrichLatest(all.filter((dep) => dep.name.startsWith('hexo-') && dep.name !== 'hexo' && dep.source !== 'theme'));
   const enrichedHexo = hexo ? (await enrichLatest([hexo]))[0] : undefined;
   const theme = themeFromPackage || themeFromFolder;
-  const enrichedTheme = theme ? (await enrichLatest([theme]))[0] : undefined;
-  const combined = enrichedTheme && !all.some((dep) => dep.name === enrichedTheme.name) ? [...all, enrichedTheme] : all;
+  const themeCandidate = theme ? { ...theme, name: theme.packageName || theme.name } : undefined;
+  const enrichedTheme = themeCandidate ? (await enrichLatest([themeCandidate]))[0] : undefined;
+  const normalizedTheme = enrichedTheme ? { ...enrichedTheme, name: theme?.name || enrichedTheme.name, canUpgrade: false } : undefined;
+  const combined = normalizedTheme && !all.some((dep) => dep.source === 'theme' || dep.name === normalizedTheme.name) ? [...all, normalizedTheme] : all.map((dep) => {
+    if (dep.source !== 'theme' || !normalizedTheme) return dep;
+    return { ...dep, latest: normalizedTheme.latest, updateHint: normalizedTheme.updateHint, canUpgrade: dep.packageName?.startsWith('hexo-theme-') };
+  });
   return {
     packageManager: await detectPackageManager(),
     hexo: enrichedHexo,
-    theme: enrichedTheme,
+    theme: normalizedTheme,
     plugins,
     all: uniqueDeps(await enrichLatest(combined)),
     checkedAt: new Date().toISOString(),
-    note: '当前版本来自仓库 package.json 和主题 package.json；latest 字段来自 npm registry。若部署环境无法访问 registry，则只显示当前版本。'
+    note: '当前版本来自仓库 package.json 和 themes/<active-theme>/package.json；latest 字段来自 npm registry。依赖支持一键写回 package.json 升级，自定义主题会优先展示自身 package.json 版本。'
   };
+}
+
+export async function upgradeDependencyVersion(input: { name: string; source: 'dependencies' | 'devDependencies' | 'theme'; version?: string }) {
+  const packageFile = await getFile('package.json');
+  const packageJson = JSON.parse(packageFile.content) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const bucket = input.source === 'dependencies'
+    ? (packageJson.dependencies ||= {})
+    : input.source === 'devDependencies'
+      ? (packageJson.devDependencies ||= {})
+      : (packageJson.dependencies?.[input.name] ? (packageJson.dependencies ||= {}) : (packageJson.devDependencies ||= {}));
+  const current = bucket[input.name];
+  if (!current) throw new Error(`package.json 中找不到 ${input.source}.${input.name}`);
+  const latest = input.version || await getLatestVersion(input.name);
+  if (!latest) throw new Error(`无法获取 ${input.name} 的最新版本`);
+  bucket[input.name] = `^${latest}`;
+  const content = `${JSON.stringify(packageJson, null, 2)}\n`;
+  const result = await putFile({
+    path: 'package.json',
+    content,
+    sha: packageFile.sha,
+    message: `Upgrade ${input.name} to ${latest}`
+  });
+  return { name: input.name, source: input.source, previous: current, current: bucket[input.name], latest, sha: result.content.sha, commit: result.commit };
 }

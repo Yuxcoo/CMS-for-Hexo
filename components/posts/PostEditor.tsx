@@ -1,7 +1,7 @@
 'use client';
 
 import type { ClipboardEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -35,6 +35,8 @@ type Props = {
   initial?: PostContent;
   onSaved?: (post: { path: string; sha: string }) => void;
   onDeleted?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  registerDraftSaver?: (saver: (() => Promise<boolean>) | null) => void;
 };
 
 type HistoryState = {
@@ -343,7 +345,7 @@ function ToolbarButton({
   );
 }
 
-export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
+export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, registerDraftSaver }: Props) {
   const [meta, setMeta] = useState<PostMeta>(initial?.meta || emptyMeta);
   const [body, setBody] = useState(initial?.body || '');
   const [path, setPath] = useState(initial?.path || '');
@@ -361,12 +363,32 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   const [imageUrl, setImageUrl] = useState('');
   const [overflowAction, setOverflowAction] = useState<ToolbarOverflowAction | ''>('');
   const preview = useMemo(() => renderMarkdownPreview(body || ''), [body]);
+  const initialSnapshot = useMemo(() => JSON.stringify({
+    meta: {
+      ...cleanMeta({
+        ...meta,
+        title: meta.title || '',
+        date: meta.date || '',
+        tags: meta.tags || [],
+        categories: meta.categories || [],
+        excerpt: meta.excerpt || '',
+        permalink: String(meta.permalink || ''),
+        priority: Number(meta.priority || 0),
+        sticky: Boolean(meta.sticky)
+      }),
+      excerpt: String(meta.excerpt || '')
+    },
+    body,
+    path
+  }), [body, meta, path]);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const colorInputRef = useRef<HTMLInputElement | null>(null);
   const highlightInputRef = useRef<HTMLInputElement | null>(null);
   const historyRef = useRef<HistoryState>({ past: [], future: [] });
   const suppressHistoryRef = useRef(false);
+  const savedSnapshotRef = useRef('');
+  const isDirty = initialSnapshot !== savedSnapshotRef.current;
 
   useEffect(() => {
     if (!initial) return;
@@ -383,6 +405,35 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     setSha(initial.sha);
     setSelection({ start: 0, end: 0 });
   }, [initial]);
+
+  useEffect(() => {
+    if (!initial) {
+      savedSnapshotRef.current = JSON.stringify({ meta: emptyMeta, body: '', path: '' });
+      return;
+    }
+    savedSnapshotRef.current = JSON.stringify({
+      meta: {
+        ...cleanMeta({
+          ...initial.meta,
+          title: initial.meta.title || '',
+          date: initial.meta.date || '',
+          tags: initial.meta.tags || [],
+          categories: initial.meta.categories || [],
+          excerpt: initial.meta.excerpt || '',
+          permalink: String(initial.meta.permalink || ''),
+          priority: Number(initial.meta.priority || 0),
+          sticky: Boolean(initial.meta.sticky)
+        }),
+        excerpt: String(initial.meta.excerpt || '')
+      },
+      body: initial.body || '',
+      path: initial.path || ''
+    });
+  }, [initial]);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   function updateMeta(key: keyof PostMeta, value: PostMeta[keyof PostMeta]) {
     setMeta((current) => ({ ...current, [key]: value }));
@@ -682,13 +733,13 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     setMessage('已插入外链图片 Markdown');
   }
 
-  async function save(targetKind: PostKind = kind) {
+  const save = useCallback(async (targetKind: PostKind = kind, silent = false) => {
     if (!meta.title.trim()) {
       setMessage('标题不能为空');
-      return;
+      return false;
     }
     setBusy(true);
-    setMessage(targetKind === 'post' ? '正在保存并触发发布...' : '正在保存到草稿...');
+    if (!silent) setMessage(targetKind === 'post' ? '正在保存并触发发布...' : '正在保存到草稿...');
     const endpoint = targetKind === 'post' ? '/api/posts' : '/api/drafts';
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -706,13 +757,36 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     setBusy(false);
     if (!response.ok) {
       setMessage(result.error || '保存失败');
-      return;
+      return false;
     }
     setPath(result.path);
     setSha(result.sha);
+    savedSnapshotRef.current = JSON.stringify({
+      meta: {
+        ...cleanMeta({
+          ...meta,
+          permalink: String(meta.permalink || ''),
+          priority: Number(meta.priority || 0),
+          sticky: Boolean(meta.sticky)
+        }),
+        excerpt: String(meta.excerpt || '')
+      },
+      body,
+      path: result.path
+    });
     setMessage(`${targetKind === 'post' ? '已保存，GitHub Actions 将自动发布' : '已保存至草稿'}：${result.commit?.sha?.slice(0, 7) || result.sha.slice(0, 7)}`);
     onSaved?.({ path: result.path, sha: result.sha });
-  }
+    return true;
+  }, [body, initial?.path, kind, meta, onSaved, path, sha]);
+
+  useEffect(() => {
+    if (!registerDraftSaver) return;
+    registerDraftSaver(async () => {
+      const ok = await save('draft', true);
+      return ok;
+    });
+    return () => registerDraftSaver(null);
+  }, [registerDraftSaver, save]);
 
   async function remove() {
     if (!path || !sha || !confirm('确认删除这篇内容？')) return;

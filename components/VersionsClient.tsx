@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ArrowUpCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { DependencyVersion, VersionReport } from '@/types/version';
 
-function VersionRow({ item }: { item: DependencyVersion }) {
+function VersionRow({ item, onUpgrade, upgrading }: { item: DependencyVersion; onUpgrade: (item: DependencyVersion) => void; upgrading: boolean }) {
   const state = item.updateHint === 'maybe-outdated' ? '可能可更新' : item.updateHint === 'ok' ? '最新' : '未知';
   const stateClass = item.updateHint === 'ok' ? 'text-success' : item.updateHint === 'maybe-outdated' ? 'text-blue' : 'text-muted';
   return (
@@ -15,6 +15,15 @@ function VersionRow({ item }: { item: DependencyVersion }) {
       <td className="px-3 py-3 text-muted">{item.latest || '-'}</td>
       <td className="px-3 py-3 text-muted">{item.source}</td>
       <td className={`px-3 py-3 font-semibold ${stateClass}`}>{state}</td>
+      <td className="px-3 py-3 text-right">
+        {item.canUpgrade && item.latest && item.updateHint === 'maybe-outdated' ? (
+          <Button variant="secondary" className="min-h-8 px-3 py-1 text-[13px]" onClick={() => onUpgrade(item)} disabled={upgrading}>
+            <ArrowUpCircle size={15} />{upgrading ? '升级中...' : '升级'}
+          </Button>
+        ) : (
+          <span className="text-[12px] text-muted">{item.source === 'theme' ? '主题仅检测' : '-'}</span>
+        )}
+      </td>
     </tr>
   );
 }
@@ -22,6 +31,7 @@ function VersionRow({ item }: { item: DependencyVersion }) {
 export function VersionsClient() {
   const [report, setReport] = useState<VersionReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [upgradingName, setUpgradingName] = useState('');
 
   async function load() {
     setLoading(true);
@@ -29,6 +39,19 @@ export function VersionsClient() {
     const result = await response.json();
     setReport(result.report || null);
     setLoading(false);
+  }
+
+  async function upgrade(item: DependencyVersion) {
+    if (!item.canUpgrade) return;
+    setUpgradingName(`${item.name}:${item.source}`);
+    const response = await fetch('/api/versions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'upgrade', name: item.name, source: item.source, version: item.latest })
+    });
+    await response.json();
+    setUpgradingName('');
+    load();
   }
 
   useEffect(() => {
@@ -57,10 +80,11 @@ export function VersionsClient() {
                 <th className="px-3 py-3 font-semibold">最新</th>
                 <th className="px-3 py-3 font-semibold">来源</th>
                 <th className="px-3 py-3 font-semibold">状态</th>
+                <th className="px-3 py-3 font-semibold text-right">操作</th>
               </tr>
             </thead>
             <tbody>
-              {report?.all.map((item) => <VersionRow key={`${item.name}-${item.source}`} item={item} />)}
+              {report?.all.map((item) => <VersionRow key={`${item.name}-${item.source}`} item={item} onUpgrade={upgrade} upgrading={upgradingName === `${item.name}:${item.source}`} />)}
             </tbody>
           </table>
         </div>
