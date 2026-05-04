@@ -1,6 +1,6 @@
 import YAML from 'yaml';
 import { inflateRawSync } from 'zlib';
-import { getFile, listDirectory, putFile, putFiles } from './github';
+import { deleteFile, getFile, getFileBase64, listDirectory, putFile, putFiles } from './github';
 import { assertSafeRepoPath, isInsideDir, joinRepoPath, normalizeRepoPath, slugify } from './paths';
 import type { GitHubFile } from '@/types/github';
 
@@ -261,4 +261,72 @@ export async function saveThemeFile(input: { path: string; content: string; sha?
   if (!isEditableThemePath(normalized)) throw new Error('仅支持保存文本主题文件。');
   const result = await putFile({ path: normalized, content: input.content, sha: input.sha || undefined, message: `Update theme file: ${normalized}` });
   return { path: normalized, sha: result.content.sha, commit: result.commit };
+}
+
+async function walkThemeFiles(path: string): Promise<Array<{ path: string; sha: string }>> {
+  const entries = await listDirectory(path).catch((error) => {
+    if (String(error).includes('404')) return [];
+    throw error;
+  });
+  const files: Array<{ path: string; sha: string }> = [];
+  for (const entry of entries) {
+    if (entry.type === 'dir') {
+      files.push(...await walkThemeFiles(entry.path));
+      continue;
+    }
+    files.push({ path: entry.path, sha: entry.sha });
+  }
+  return files;
+}
+
+export async function renameTheme(name: string, nextName: string) {
+  const currentName = safeThemeName(name);
+  const targetName = safeThemeName(nextName);
+  if (!currentName) throw new Error('缺少当前主题名');
+  if (!targetName) throw new Error('缺少新主题名');
+  if (currentName === targetName) return { theme: targetName, renamed: 0, active: (await activeThemeName()) === currentName };
+
+  const sourceBase = joinRepoPath('themes', currentName);
+  const targetBase = joinRepoPath('themes', targetName);
+  const sourceEntries = await walkThemeFiles(sourceBase);
+  if (!sourceEntries.length) throw new Error('当前主题目录为空或不存在');
+  const existsTarget = await listDirectory(targetBase).then(() => true).catch((error) => {
+    if (String(error).includes('404')) return false;
+    throw error;
+  });
+  if (existsTarget) throw new Error('目标主题名称已存在，请换一个名称');
+
+  const files = await Promise.all(sourceEntries.map(async (entry) => {
+    const file = await getFileBase64(entry.path);
+    const relative = entry.path.slice(sourceBase.length + 1);
+    return { path: joinRepoPath(targetBase, relative), contentBase64: file.contentBase64 };
+  }));
+
+  await putFiles({ files, message: `Rename Hexo theme: ${currentName} -> ${targetName}` });
+  for (const entry of sourceEntries.reverse()) {
+    await deleteFile({ path: entry.path, sha: entry.sha, message: `Remove old Hexo theme path: ${entry.path}` });
+  }
+
+  const activeTheme = await activeThemeName();
+  if (activeTheme === currentName) {
+    await activateTheme(targetName);
+  }
+
+  return { theme: targetName, renamed: sourceEntries.length, active: activeTheme === currentName };
+}
+
+export async function removeTheme(name: string) {
+  const themeName = safeThemeName(name);
+  const activeTheme = await activeThemeName();
+  if (themeName === activeTheme) {
+    throw new Error('不能删除当前正在使用的主题，请先切换到其他主题');
+  }
+
+  const base = joinRepoPath('themes', themeName);
+  const files = await walkThemeFiles(base);
+  if (!files.length) throw new Error('主题不存在或已经被删除');
+  for (const file of files.reverse()) {
+    await deleteFile({ path: file.path, sha: file.sha, message: `Delete Hexo theme: ${themeName}` });
+  }
+  return { theme: themeName, deleted: files.length };
 }

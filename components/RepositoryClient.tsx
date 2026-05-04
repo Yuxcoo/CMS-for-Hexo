@@ -15,6 +15,18 @@ type Repository = {
   htmlUrl: string;
 };
 
+type SetupGuide = {
+  fullName: string;
+  repoUrl: string;
+  pagesSettingsUrl: string;
+  siteUrl: string;
+};
+
+function siteUrlFor(repo: { owner: string; name: string }) {
+  const isUserPage = repo.name.toLowerCase() === `${repo.owner.toLowerCase()}.github.io`;
+  return `https://${repo.owner}.github.io${isUserPage ? '' : `/${repo.name}`}`;
+}
+
 export function RepositoryClient() {
   const pathname = usePathname();
   const [repos, setRepos] = useState<Repository[]>([]);
@@ -23,6 +35,7 @@ export function RepositoryClient() {
   const [description, setDescription] = useState('Hexo blog content repository');
   const [isPrivate, setIsPrivate] = useState(false);
   const [message, setMessage] = useState('');
+  const [setupGuide, setSetupGuide] = useState<SetupGuide | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -73,6 +86,7 @@ export function RepositoryClient() {
   async function createRepo() {
     setBusy(true);
     setMessage(`正在创建并初始化：${name}...`);
+    setSetupGuide(null);
     try {
       const response = await fetch('/api/repositories', {
         method: 'POST',
@@ -85,11 +99,13 @@ export function RepositoryClient() {
         setBusy(false);
         return;
       }
-      if (pathname === '/onboarding') {
-        setMessage(`已创建并初始化：${result.repo.full_name}，正在进入仪表盘...`);
-        window.location.assign('/dashboard');
-        return;
-      }
+      const guide = {
+        fullName: result.repo.full_name,
+        repoUrl: result.repo.html_url,
+        pagesSettingsUrl: `${result.repo.html_url}/settings/pages`,
+        siteUrl: siteUrlFor({ owner: result.repo.owner.login, name: result.repo.name })
+      } satisfies SetupGuide;
+      setSetupGuide(guide);
       setMessage(`已创建并初始化：${result.repo.full_name}`);
       setBusy(false);
       load();
@@ -134,8 +150,19 @@ export function RepositoryClient() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={createRepo} disabled={busy || !name.trim()}><Plus size={17} />{busy ? '处理中...' : '创建可发布博客'}</Button>
             <Button variant="secondary" onClick={initializeCurrent} disabled={busy}><Wand2 size={17} />补全当前仓库</Button>
+            {setupGuide && pathname === '/onboarding' ? <Button variant="ghost" onClick={() => window.location.assign('/dashboard')}>进入仪表盘</Button> : null}
           </div>
           {message ? <p className="apple-message break-all">{message}</p> : null}
+          {setupGuide ? (
+            <div className="apple-message grid gap-2">
+              <div className="font-semibold text-ink">下一步请检查 GitHub Pages 分支设置</div>
+              <div>仓库已经初始化完成，但 GitHub 新仓库的 Pages 来源不一定会自动切到 `gh-pages`。</div>
+              <div>请打开仓库的 `Settings -&gt; Pages`，确认 Source 使用 `Deploy from a branch`，并把 Branch 设为 `gh-pages`、Folder 设为 `/ (root)`。</div>
+              <div className="break-all">仓库：<a href={setupGuide.repoUrl} target="_blank" className="text-blue underline underline-offset-2">{setupGuide.fullName}</a></div>
+              <div className="break-all">Pages 设置：<a href={setupGuide.pagesSettingsUrl} target="_blank" className="text-blue underline underline-offset-2">{setupGuide.pagesSettingsUrl}</a></div>
+              <div className="break-all">预期站点地址：<a href={setupGuide.siteUrl} target="_blank" className="text-blue underline underline-offset-2">{setupGuide.siteUrl}</a></div>
+            </div>
+          ) : null}
         </div>
       </section>
       <section className="apple-panel overflow-hidden">

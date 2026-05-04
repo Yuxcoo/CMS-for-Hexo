@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, FileCode2, Folder, Loader2, Palette, Save, UploadCloud } from 'lucide-react';
+import { Check, FileCode2, Folder, Loader2, Palette, Pencil, Save, Trash2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Field, TextArea, TextInput } from '@/components/ui/Field';
 
@@ -55,10 +55,11 @@ export function ThemesClient() {
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [renameValue, setRenameValue] = useState('');
 
   const selected = useMemo(() => themes.find((theme) => theme.name === selectedTheme), [selectedTheme, themes]);
 
-  async function loadThemes() {
+  const loadThemes = useCallback(async () => {
     const response = await fetch('/api/themes');
     const result = await response.json();
     if (!response.ok) {
@@ -67,8 +68,12 @@ export function ThemesClient() {
     }
     setThemes(result.themes || []);
     setActiveTheme(result.activeTheme || '');
-    setSelectedTheme((current) => current || result.activeTheme || result.themes?.[0]?.name || '');
-  }
+    const nextSelected = selectedTheme && result.themes?.some((theme: ThemeSummary) => theme.name === selectedTheme)
+      ? selectedTheme
+      : result.activeTheme || result.themes?.[0]?.name || '';
+    setSelectedTheme(nextSelected);
+    setRenameValue((current) => current || nextSelected);
+  }, [selectedTheme]);
 
   const loadFiles = useCallback(async (theme: string, dir: string) => {
     if (!theme) return;
@@ -84,6 +89,7 @@ export function ThemesClient() {
 
   async function openTheme(theme: ThemeSummary) {
     setSelectedTheme(theme.name);
+    setRenameValue(theme.name);
     setEditing(null);
   }
 
@@ -101,7 +107,49 @@ export function ThemesClient() {
       return;
     }
     setMessage(`已启用主题：${result.theme}`);
-    loadThemes();
+    await loadThemes();
+  }
+
+  async function renameTheme() {
+    if (!selectedTheme || !renameValue.trim() || renameValue.trim() === selectedTheme) return;
+    setBusy(true);
+    const response = await fetch('/api/themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rename', name: selectedTheme, nextName: renameValue.trim() })
+    });
+    const result = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setMessage(result.error || '重命名主题失败');
+      return;
+    }
+    setSelectedTheme(result.theme);
+    setRenameValue(result.theme);
+    setMessage(`已重命名主题：${selectedTheme} -> ${result.theme}`);
+    await loadThemes();
+    await loadFiles(result.theme, '');
+  }
+
+  async function deleteTheme() {
+    if (!selectedTheme || selectedTheme === activeTheme || !confirm(`确认删除主题 ${selectedTheme}？`)) return;
+    setBusy(true);
+    const response = await fetch('/api/themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', name: selectedTheme })
+    });
+    const result = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setMessage(result.error || '删除主题失败');
+      return;
+    }
+    setMessage(`已删除主题：${result.theme}`);
+    setEditing(null);
+    setSelectedTheme('');
+    setRenameValue('');
+    await loadThemes();
   }
 
   async function install(file: File) {
@@ -179,7 +227,7 @@ export function ThemesClient() {
 
   useEffect(() => {
     loadThemes();
-  }, []);
+  }, [loadThemes]);
 
   useEffect(() => {
     if (selectedTheme) loadFiles(selectedTheme, '');
@@ -206,7 +254,22 @@ export function ThemesClient() {
               </button>
             ))}
           </div>
-          {selected ? <div className="border-t border-line p-3"><Button variant={selected.active ? 'ghost' : 'secondary'} className="w-full" onClick={() => activate(selected.name)} disabled={busy || selected.active}>{selected.active ? '当前主题' : '启用主题'}</Button></div> : null}
+          {selected ? (
+            <div className="grid gap-2 border-t border-line p-3">
+              <Button variant={selected.active ? 'ghost' : 'secondary'} className="w-full" onClick={() => activate(selected.name)} disabled={busy || selected.active}>{selected.active ? '当前主题' : '启用主题'}</Button>
+              <Field label="重命名主题">
+                <TextInput value={renameValue} onChange={(event) => setRenameValue(event.target.value)} placeholder="新的主题名称" />
+              </Field>
+              <div className="flex gap-2">
+                <Button variant="secondary" className="flex-1" onClick={renameTheme} disabled={busy || !renameValue.trim() || renameValue.trim() === selected.name}>
+                  <Pencil size={16} />重命名
+                </Button>
+                <Button variant="danger" className="flex-1" onClick={deleteTheme} disabled={busy || selected.active}>
+                  <Trash2 size={16} />{selected.active ? '当前主题不可删' : '删除'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </section>
         <section className={`apple-panel border-dashed p-4 transition ${dragging ? 'border-blue bg-blue/5' : ''}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); const file = event.dataTransfer.files?.[0]; if (file) install(file); }}>
           <div className="grid gap-3">

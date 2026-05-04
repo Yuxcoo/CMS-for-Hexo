@@ -121,6 +121,13 @@ export async function getFile(path: string, context?: RepoContext): Promise<{ co
   return { content, sha: file.sha, path: file.path, name: file.name, size: file.size };
 }
 
+export async function getFileBase64(path: string, context?: RepoContext): Promise<{ contentBase64: string; sha: string; path: string; name: string; size: number }> {
+  const target = context || getRepoContext();
+  const suffix = `/contents/${encodePath(path)}?ref=${encodeURIComponent(branchFor(target))}`;
+  const file = await githubFetch<GitHubFile & { content: string; encoding: string }>(repoApiPathFor(target, suffix));
+  return { contentBase64: file.content.replace(/\n/g, ''), sha: file.sha, path: file.path, name: file.name, size: file.size };
+}
+
 export async function putFile(params: { path: string; content?: string; contentBase64?: string; message: string; sha?: string; context?: RepoContext }) {
   const context = params.context || getRepoContext();
   const suffix = `/contents/${encodePath(params.path)}`;

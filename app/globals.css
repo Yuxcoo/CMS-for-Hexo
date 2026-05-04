@@ -131,13 +131,20 @@ select {
 
 .editor-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 12px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.editor-toolbar-single-line {
+  min-width: 0;
 }
 
 .editor-toolbar-button,
 .editor-toolbar-select {
+  flex: 0 0 auto;
   min-height: 38px;
   border: 1px solid rgb(var(--color-line));
   border-radius: 12px;
@@ -182,6 +189,10 @@ select {
     calc(100% - 11px) calc(50% - 3px);
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
+}
+
+.editor-toolbar .ml-auto {
+  margin-left: auto;
 }
 
 .editor-document {

@@ -8,13 +8,7 @@ import {
   Eraser,
   FilePenLine,
   GripVertical,
-  Heading1,
-  Heading2,
-  Heading3,
-  Highlighter,
   ImagePlus,
-  IndentDecrease,
-  IndentIncrease,
   Italic,
   Link2,
   List,
@@ -23,11 +17,9 @@ import {
   Paintbrush2,
   Pin,
   PinOff,
-  Quote,
   Redo2,
   Save,
   Strikethrough,
-  Table2,
   Trash2,
   Underline,
   Undo2,
@@ -56,8 +48,12 @@ type SelectionRange = {
 };
 
 type BrushStyle =
-  | { kind: 'wrap'; prefix: string; suffix: string }
-  | { kind: 'block'; prefix: string };
+  | {
+    kind: 'composite';
+    block?: 'h1' | 'h2' | 'h3' | 'quote' | 'unordered-list' | 'ordered-list' | 'task-list';
+    indentDepth?: number;
+    wrappers: Array<{ prefix: string; suffix: string }>;
+  };
 
 type BlockInsertOption =
   | 'h1'
@@ -77,6 +73,7 @@ type BlockInsertOption =
 type BlockStyleOption = 'paragraph' | 'h1' | 'h2' | 'h3' | 'quote' | 'code';
 type IndentOption = 'increase' | 'decrease';
 type ImageInsertMode = 'upload' | 'link';
+type ToolbarOverflowAction = 'color' | 'highlight' | 'table' | 'quote' | 'divider' | 'formula';
 
 const emptyMeta: PostMeta = {
   title: '',
@@ -135,6 +132,14 @@ function isImageUrl(value: string) {
   return /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif|bmp)(\?\S*)?(#\S*)?$/i.test(value.trim());
 }
 
+function stripListLine(value: string) {
+  return value
+    .replace(/^\s*[-*+]\s+\[[ xX]\]\s+/, '')
+    .replace(/^\s*\d+\.\s+/, '')
+    .replace(/^\s*[-*+]\s+/, '')
+    .trim();
+}
+
 function stripBlockMarkdown(value: string) {
   return value
     .split('\n')
@@ -173,6 +178,142 @@ function toggleLinePrefix(value: string, prefix: string) {
     if (everyLineHasPrefix) return line.replace(expression, '');
     return `${prefix}${line || (index === 0 ? '内容' : '')}`;
   }).join('\n');
+}
+
+function toggleOrderedList(value: string) {
+  const lines = (value || '列表项').split('\n');
+  const everyLineOrdered = lines.every((line) => /^\s*\d+\.\s+/.test(line));
+  return lines.map((line, index) => {
+    if (everyLineOrdered) return line.replace(/^\s*\d+\.\s+/, '');
+    return `${index + 1}. ${stripListLine(line) || `列表项 ${index + 1}`}`;
+  }).join('\n');
+}
+
+function applyOrderedList(value: string) {
+  return (value || '列表项')
+    .split('\n')
+    .map((line, index) => `${index + 1}. ${stripListLine(line) || `列表项 ${index + 1}`}`)
+    .join('\n');
+}
+
+function detectBrushStyle(value: string): BrushStyle | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const wrappers: Array<{ prefix: string; suffix: string }> = [];
+  let working = trimmed;
+
+  const lines = working.split('\n');
+  let block: BrushStyle['block'];
+  let indentDepth = 0;
+
+  if (lines.every((line) => /^###\s+/.test(line))) {
+    block = 'h3';
+    working = lines.map((line) => line.replace(/^###\s+/, '')).join('\n');
+  } else if (lines.every((line) => /^##\s+/.test(line))) {
+    block = 'h2';
+    working = lines.map((line) => line.replace(/^##\s+/, '')).join('\n');
+  } else if (lines.every((line) => /^#\s+/.test(line))) {
+    block = 'h1';
+    working = lines.map((line) => line.replace(/^#\s+/, '')).join('\n');
+  } else if (lines.every((line) => /^>\s?/.test(line))) {
+    block = 'quote';
+    working = lines.map((line) => line.replace(/^>\s?/, '')).join('\n');
+  } else if (lines.every((line) => /^-\s+\[[ xX]\]\s+/.test(line))) {
+    block = 'task-list';
+    working = lines.map((line) => line.replace(/^-\s+\[[ xX]\]\s+/, '')).join('\n');
+  } else if (lines.every((line) => /^\d+\.\s+/.test(line))) {
+    block = 'ordered-list';
+    working = lines.map((line) => line.replace(/^\d+\.\s+/, '')).join('\n');
+  } else if (lines.every((line) => /^[-*+]\s+/.test(line))) {
+    block = 'unordered-list';
+    working = lines.map((line) => line.replace(/^[-*+]\s+/, '')).join('\n');
+  }
+
+  const indentMatches = working.split('\n').map((line) => {
+    const match = line.match(/^(\s+)/);
+    return match ? match[1].length : 0;
+  }).filter((value) => value > 0);
+  if (indentMatches.length) {
+    indentDepth = Math.min(...indentMatches);
+    working = working.split('\n').map((line) => line.replace(new RegExp(`^\\s{0,${indentDepth}}`), '')).join('\n');
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+
+    const colorMatch = working.match(/^<span style="color:\s*([^";]+);?">([\s\S]*)<\/span>$/i);
+    if (colorMatch) {
+      wrappers.push({ prefix: `<span style="color: ${colorMatch[1]};">`, suffix: '</span>' });
+      working = colorMatch[2];
+      changed = true;
+      continue;
+    }
+
+    const highlightMatch = working.match(/^<mark style="background-color:\s*([^";]+);\s*color:\s*inherit;">([\s\S]*)<\/mark>$/i);
+    if (highlightMatch) {
+      wrappers.push({ prefix: `<mark style="background-color: ${highlightMatch[1]}; color: inherit;">`, suffix: '</mark>' });
+      working = highlightMatch[2];
+      changed = true;
+      continue;
+    }
+
+    const underlineMatch = working.match(/^<u>([\s\S]*)<\/u>$/i);
+    if (underlineMatch) {
+      wrappers.push({ prefix: '<u>', suffix: '</u>' });
+      working = underlineMatch[1];
+      changed = true;
+      continue;
+    }
+
+    const strongMatch = working.match(/^\*\*([\s\S]*)\*\*$/);
+    if (strongMatch) {
+      wrappers.push({ prefix: '**', suffix: '**' });
+      working = strongMatch[1];
+      changed = true;
+      continue;
+    }
+
+    const strikeMatch = working.match(/^~~([\s\S]*)~~$/);
+    if (strikeMatch) {
+      wrappers.push({ prefix: '~~', suffix: '~~' });
+      working = strikeMatch[1];
+      changed = true;
+      continue;
+    }
+
+    const italicMatch = working.match(/^\*([\s\S]*)\*$/);
+    if (italicMatch) {
+      wrappers.push({ prefix: '*', suffix: '*' });
+      working = italicMatch[1];
+      changed = true;
+    }
+  }
+
+  if (!block && !indentDepth && !wrappers.length) return null;
+  return { kind: 'composite', block, indentDepth, wrappers };
+}
+
+function applyBrushStyle(value: string, style: BrushStyle) {
+  let next = stripBlockMarkdown(stripInlineMarkdown(value || '内容'));
+
+  if (style.block === 'h1') next = applyLinePrefix(next, '# ');
+  if (style.block === 'h2') next = applyLinePrefix(next, '## ');
+  if (style.block === 'h3') next = applyLinePrefix(next, '### ');
+  if (style.block === 'quote') next = applyLinePrefix(next, '> ');
+  if (style.block === 'unordered-list') next = applyLinePrefix(next, '- ');
+  if (style.block === 'ordered-list') next = applyOrderedList(next);
+  if (style.block === 'task-list') next = applyLinePrefix(next, '- [ ] ');
+  if (style.indentDepth) {
+    next = next.split('\n').map((line) => `${' '.repeat(style.indentDepth || 0)}${line}`).join('\n');
+  }
+
+  [...style.wrappers].reverse().forEach((wrapper) => {
+    next = `${wrapper.prefix}${next}${wrapper.suffix}`;
+  });
+
+  return next;
 }
 
 function ToolbarButton({
@@ -218,6 +359,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
   const [imageMode, setImageMode] = useState<ImageInsertMode>('upload');
   const [imageAlt, setImageAlt] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [overflowAction, setOverflowAction] = useState<ToolbarOverflowAction | ''>('');
   const preview = useMemo(() => renderMarkdownPreview(body || ''), [body]);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -338,21 +480,37 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
     focusEditor({ start: next.length, end: next.length });
   }
 
-  function setBrush(kind: BrushStyle['kind'], prefix: string, suffix = prefix) {
-    setBrushStyle(kind === 'block' ? { kind, prefix } : { kind, prefix, suffix });
-    setMessage(`已复制格式，选择下一段内容后点击“格式刷”可应用`);
+  function captureBrush() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const selected = body.slice(editor.selectionStart, editor.selectionEnd);
+    const style = detectBrushStyle(selected);
+    if (!style) {
+      setMessage('请先选中一段带格式的内容，再点击格式刷复制格式');
+      return;
+    }
+    setBrushStyle(style);
+    setMessage('已复制当前选区格式，选择另一段内容后再次点击格式刷即可应用');
   }
 
   function applyBrush() {
-    if (!brushStyle) {
-      setMessage('请先选中一段带格式的内容，再点击一次格式刷复制样式');
+    const editor = editorRef.current;
+    const selected = editor ? body.slice(editor.selectionStart, editor.selectionEnd) : '';
+    const detected = detectBrushStyle(selected);
+
+    if (detected) {
+      setBrushStyle(detected);
+      setMessage('已复制当前选区格式，选择另一段内容后再次点击格式刷即可应用');
       return;
     }
-    if (brushStyle.kind === 'block') {
-      transformSelection((selected) => toggleLinePrefix(selected, brushStyle.prefix));
+
+    if (!brushStyle || brushStyle.kind !== 'composite') {
+      captureBrush();
       return;
     }
-    transformSelection((selected) => toggleWrap(selected, brushStyle.prefix, brushStyle.suffix));
+    transformSelection((selected) => applyBrushStyle(selected, brushStyle));
+    setBrushStyle(null);
+    setMessage('已应用复制的格式');
   }
 
   function clearStyles() {
@@ -457,6 +615,33 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
         return line.replace(/^\s{1,2}/, '');
       }).join('\n');
     });
+  }
+
+  function runOverflowAction(value: ToolbarOverflowAction) {
+    setOverflowAction('');
+    if (value === 'color') {
+      colorInputRef.current?.click();
+      return;
+    }
+    if (value === 'highlight') {
+      highlightInputRef.current?.click();
+      return;
+    }
+    if (value === 'table') {
+      insertTable();
+      return;
+    }
+    if (value === 'quote') {
+      transformSelection((selected) => toggleLinePrefix(selected, '> '));
+      return;
+    }
+    if (value === 'divider') {
+      transformSelection(() => '\n---\n');
+      return;
+    }
+    if (value === 'formula') {
+      transformSelection((selected) => `$$\n${selected.trim() || 'E = mc^2'}\n$$`);
+    }
   }
 
   async function uploadImage(file: File) {
@@ -641,68 +826,74 @@ export function PostEditor({ kind, initial, onSaved, onDeleted }: Props) {
         {message ? <p className="mx-4 mb-4 apple-message break-all">{message}</p> : null}
       </section>
 
+      <section className="apple-panel overflow-hidden">
+        <div className="editor-toolbar-wrap border-b border-line">
+          <div className="editor-toolbar editor-toolbar-single-line">
+            <ToolbarButton title="撤销" onClick={undo} disabled={!historyRef.current.past.length}><Undo2 size={16} /></ToolbarButton>
+            <ToolbarButton title="复原" onClick={redo} disabled={!historyRef.current.future.length}><Redo2 size={16} /></ToolbarButton>
+            <ToolbarButton title="格式刷" onClick={applyBrush} active={Boolean(brushStyle)}><Paintbrush2 size={16} /></ToolbarButton>
+            <ToolbarButton title="清除样式" onClick={clearStyles}><Eraser size={16} /></ToolbarButton>
+
+            <select className="editor-toolbar-select min-w-[148px]" value={insertValue} onChange={(event) => {
+              const value = event.target.value as BlockInsertOption | '';
+              setInsertValue(value);
+              if (value) insertBlock(value);
+            }}>
+              <option value="">插入</option>
+              {Object.entries(blockInsertLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+
+            <select className="editor-toolbar-select min-w-[112px]" value={blockValue} onChange={(event) => applyBlockStyle(event.target.value as BlockStyleOption)}>
+              <option value="paragraph">正文</option>
+              <option value="h1">一级标题</option>
+              <option value="h2">二级标题</option>
+              <option value="h3">三级标题</option>
+              <option value="quote">引用</option>
+              <option value="code">代码块</option>
+            </select>
+
+            <ToolbarButton title="加粗" onClick={() => transformSelection((selected) => toggleWrap(selected, '**'))}><strong>B</strong></ToolbarButton>
+            <ToolbarButton title="斜体" onClick={() => transformSelection((selected) => toggleWrap(selected, '*'))}><Italic size={16} /></ToolbarButton>
+            <ToolbarButton title="删除线" onClick={() => transformSelection((selected) => toggleWrap(selected, '~~'))}><Strikethrough size={16} /></ToolbarButton>
+            <ToolbarButton title="下划线" onClick={() => transformSelection((selected) => toggleWrap(selected, '<u>', '</u>'))}><Underline size={16} /></ToolbarButton>
+            <ToolbarButton title="无序列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- '))}><List size={16} /></ToolbarButton>
+            <ToolbarButton title="有序列表" onClick={() => transformSelection((selected) => toggleOrderedList(selected))}><ListOrdered size={16} /></ToolbarButton>
+            <ToolbarButton title="任务列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- [ ] '))}><ListChecks size={16} /></ToolbarButton>
+
+            <select className="editor-toolbar-select min-w-[96px]" defaultValue="" onChange={(event) => {
+              const value = event.target.value as IndentOption | '';
+              if (value) changeIndent(value);
+              event.target.value = '';
+            }}>
+              <option value="">缩进</option>
+              <option value="increase">增加</option>
+              <option value="decrease">减少</option>
+            </select>
+
+            <ToolbarButton title="插入图片" onClick={openImagePanel}><ImagePlus size={16} /></ToolbarButton>
+            <ToolbarButton title="插入链接" onClick={insertLink}><Link2 size={16} /></ToolbarButton>
+
+            <select className="editor-toolbar-select min-w-[108px] ml-auto" value={overflowAction} onChange={(event) => {
+              const value = event.target.value as ToolbarOverflowAction | '';
+              setOverflowAction(value);
+              if (value) runOverflowAction(value);
+            }}>
+              <option value="">更多</option>
+              <option value="color">字体颜色</option>
+              <option value="highlight">突出显示</option>
+              <option value="table">插入表格</option>
+              <option value="quote">引用</option>
+              <option value="divider">分割线</option>
+              <option value="formula">公式</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
       <section className="grid min-h-[720px] gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div className="apple-panel overflow-hidden">
-          <div className="editor-toolbar-wrap border-b border-line">
-            <div className="editor-toolbar">
-              <ToolbarButton title="撤销" onClick={undo} disabled={!historyRef.current.past.length}><Undo2 size={16} /></ToolbarButton>
-              <ToolbarButton title="复原" onClick={redo} disabled={!historyRef.current.future.length}><Redo2 size={16} /></ToolbarButton>
-              <ToolbarButton title="格式刷" onClick={applyBrush} active={Boolean(brushStyle)}><Paintbrush2 size={16} /></ToolbarButton>
-              <ToolbarButton title="清除样式" onClick={clearStyles}><Eraser size={16} /></ToolbarButton>
-
-              <select className="editor-toolbar-select min-w-[148px]" value={insertValue} onChange={(event) => {
-                const value = event.target.value as BlockInsertOption | '';
-                setInsertValue(value);
-                if (value) insertBlock(value);
-              }}>
-                <option value="">插入</option>
-                {Object.entries(blockInsertLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-
-              <select className="editor-toolbar-select min-w-[108px]" value={blockValue} onChange={(event) => applyBlockStyle(event.target.value as BlockStyleOption)}>
-                <option value="paragraph">正文</option>
-                <option value="h1">一级标题</option>
-                <option value="h2">二级标题</option>
-                <option value="h3">三级标题</option>
-                <option value="quote">引用</option>
-                <option value="code">代码块</option>
-              </select>
-
-              <ToolbarButton title="加粗" onClick={() => transformSelection((selected) => toggleWrap(selected, '**'))}><strong>B</strong></ToolbarButton>
-              <ToolbarButton title="复制当前加粗格式" onClick={() => setBrush('wrap', '**')}><strong>B+</strong></ToolbarButton>
-              <ToolbarButton title="斜体" onClick={() => transformSelection((selected) => toggleWrap(selected, '*'))}><Italic size={16} /></ToolbarButton>
-              <ToolbarButton title="删除线" onClick={() => transformSelection((selected) => toggleWrap(selected, '~~'))}><Strikethrough size={16} /></ToolbarButton>
-              <ToolbarButton title="下划线" onClick={() => transformSelection((selected) => toggleWrap(selected, '<u>', '</u>'))}><Underline size={16} /></ToolbarButton>
-              <ToolbarButton title="字体颜色" onClick={() => colorInputRef.current?.click()}><span className="text-[15px] font-semibold">A</span></ToolbarButton>
-              <ToolbarButton title="突出显示颜色" onClick={() => highlightInputRef.current?.click()}><Highlighter size={16} /></ToolbarButton>
-              <ToolbarButton title="无序列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- '))}><List size={16} /></ToolbarButton>
-              <ToolbarButton title="有序列表" onClick={() => transformSelection((selected) => applyLinePrefix(stripBlockMarkdown(selected), '1. '))}><ListOrdered size={16} /></ToolbarButton>
-              <ToolbarButton title="任务列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- [ ] '))}><ListChecks size={16} /></ToolbarButton>
-
-              <select className="editor-toolbar-select min-w-[96px]" defaultValue="" onChange={(event) => {
-                const value = event.target.value as IndentOption | '';
-                if (value) changeIndent(value);
-                event.target.value = '';
-              }}>
-                <option value="">缩进</option>
-                <option value="increase">增加</option>
-                <option value="decrease">减少</option>
-              </select>
-
-              <ToolbarButton title="插入图片" onClick={openImagePanel}><ImagePlus size={16} /></ToolbarButton>
-              <ToolbarButton title="插入表格" onClick={insertTable}><Table2 size={16} /></ToolbarButton>
-              <ToolbarButton title="插入链接" onClick={insertLink}><Link2 size={16} /></ToolbarButton>
-              <ToolbarButton title="引用" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '> '))}><Quote size={16} /></ToolbarButton>
-              <ToolbarButton title="插入水平线" onClick={() => transformSelection(() => '\n---\n')}><span className="text-[14px] font-semibold">HR</span></ToolbarButton>
-              <ToolbarButton title="一级标题格式刷" onClick={() => setBrush('block', '# ')}><Heading1 size={16} /></ToolbarButton>
-              <ToolbarButton title="二级标题格式刷" onClick={() => setBrush('block', '## ')}><Heading2 size={16} /></ToolbarButton>
-              <ToolbarButton title="三级标题格式刷" onClick={() => setBrush('block', '### ')}><Heading3 size={16} /></ToolbarButton>
-              <ToolbarButton title="增加缩进" onClick={() => changeIndent('increase')}><IndentIncrease size={16} /></ToolbarButton>
-              <ToolbarButton title="减少缩进" onClick={() => changeIndent('decrease')}><IndentDecrease size={16} /></ToolbarButton>
-            </div>
-          </div>
 
           <div className="border-b border-line bg-paper/70 px-4 py-2 text-[12px] leading-[1.35] tracking-[-0.12px] text-muted">
             文档式写作区保留 Markdown 存储，选中文字后可直接用工具栏套用结构与样式。

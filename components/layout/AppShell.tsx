@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Activity, ExternalLink, FileText, Gauge, Github, Image, LogOut, Menu, Palette, PanelTop, Rocket, ScrollText, Settings2, SlidersHorizontal } from 'lucide-react';
 import { GlobalSearch } from '@/components/layout/GlobalSearch';
@@ -23,16 +24,34 @@ function activeItem(pathname: string) {
   return nav.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) || nav[0];
 }
 
+function siteUrlFor(repo?: { owner: string; repo: string } | null) {
+  if (!repo?.owner || !repo?.repo) return null;
+  const isUserPage = repo.repo.toLowerCase() === `${repo.owner.toLowerCase()}.github.io`;
+  return `https://${repo.owner}.github.io${isUserPage ? '' : `/${repo.repo}`}`;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const current = activeItem(pathname);
   const CurrentIcon = current.icon;
+  const [repoContext, setRepoContext] = useState<{ owner: string; repo: string } | null>(null);
+  const previewUrl = useMemo(() => siteUrlFor(repoContext), [repoContext]);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   }
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((response) => response.json())
+      .then((result) => {
+        const repo = result?.currentRepository;
+        if (repo?.owner && repo?.repo) setRepoContext({ owner: repo.owner, repo: repo.repo });
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -43,16 +62,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/dashboard" className="font-display text-[13px] font-semibold leading-none tracking-[-0.12px]">
                 CMS for Hexo
               </Link>
-              <Link href="/repository" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] text-white/72 transition hover:text-white md:inline-flex">
-                <Github size={14} /> 仓库
-              </Link>
+              <a href="https://github.com/Yuxcoo/CMS-for-Hexo" target="_blank" rel="noreferrer" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] text-white/72 transition hover:text-white md:inline-flex" aria-label="CMS for Hexo 项目仓库">
+                <Github size={14} />
+              </a>
               <Link href="/versions" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] text-white/72 transition hover:text-white md:inline-flex">
                 <Activity size={14} /> 健康检查
               </Link>
             </div>
             <div className="flex items-center gap-3 text-white/78">
               <Link href="/settings" className="hidden text-[12px] leading-none tracking-[-0.12px] transition hover:text-white sm:inline-flex">站点配置</Link>
-              <a href="/" target="_blank" className="hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] transition hover:text-white md:inline-flex">
+              <a href={previewUrl || '#'} target="_blank" rel="noreferrer" className={`hidden items-center gap-1.5 text-[12px] leading-none tracking-[-0.12px] transition md:inline-flex ${previewUrl ? 'hover:text-white' : 'cursor-not-allowed opacity-50'}`} onClick={(event) => {
+                if (!previewUrl) event.preventDefault();
+              }}>
                 <ExternalLink size={14} /> 预览站点
               </a>
               <GlobalSearch />
