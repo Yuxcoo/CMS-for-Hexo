@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PostEditor, PostList } from './PostEditor';
 import { Button } from '@/components/ui/Button';
 import type { PostContent, PostKind, PostSummary } from '@/types/post';
@@ -10,11 +10,11 @@ export function PostManager({ kind }: { kind: PostKind }) {
   const [active, setActive] = useState<PostContent | undefined>();
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
-  const [draftSaver, setDraftSaver] = useState<(() => Promise<boolean>) | null>(null);
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
   const [leaveSaving, setLeaveSaving] = useState(false);
   const endpoint = kind === 'post' ? '/api/posts' : '/api/drafts';
   const [leaveResolver, setLeaveResolver] = useState<((decision: 'save' | 'discard' | 'stay') => void) | null>(null);
+  const draftSaverRef = useRef<(() => Promise<boolean>) | null>(null);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -33,10 +33,14 @@ export function PostManager({ kind }: { kind: PostKind }) {
     if (decision === 'stay') return false;
     if (decision === 'discard') return true;
     setLeaveSaving(true);
-    const saved = (await draftSaver?.()) ?? false;
+    const saved = (await draftSaverRef.current?.()) ?? false;
     setLeaveSaving(false);
     return saved;
-  }, [dirty, draftSaver]);
+  }, [dirty]);
+
+  const registerDraftSaver = useCallback((saver: (() => Promise<boolean>) | null) => {
+    draftSaverRef.current = saver;
+  }, []);
 
   async function select(post: PostSummary) {
     if (active?.path === post.path) return;
@@ -113,7 +117,7 @@ export function PostManager({ kind }: { kind: PostKind }) {
       <div>
         {loading ? <div className="apple-message">加载中...</div> : <PostList posts={items} activePath={active?.path} kind={kind} onSelect={select} onReorder={reorder} onOrderMeta={updateOrderMeta} />}
       </div>
-      <PostEditor kind={kind} initial={active} onSaved={loadList} onDeleted={() => { setActive(undefined); loadList(); }} onDirtyChange={setDirty} registerDraftSaver={(saver) => setDraftSaver(() => saver)} />
+      <PostEditor kind={kind} initial={active} onSaved={loadList} onDeleted={() => { setActive(undefined); loadList(); }} onDirtyChange={setDirty} registerDraftSaver={registerDraftSaver} />
       {leavePromptOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/28 px-4">
           <div className="w-full max-w-[460px] rounded-[18px] border border-line bg-canvas p-5 shadow-2xl">

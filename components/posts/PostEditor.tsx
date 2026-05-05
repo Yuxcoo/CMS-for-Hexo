@@ -1,7 +1,7 @@
 'use client';
 
 import type { ClipboardEvent } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -75,7 +75,10 @@ type BlockInsertOption =
 type BlockStyleOption = 'paragraph' | 'h1' | 'h2' | 'h3' | 'quote' | 'code';
 type IndentOption = 'increase' | 'decrease';
 type ImageInsertMode = 'upload' | 'link';
-type ToolbarOverflowAction = 'color' | 'highlight' | 'table' | 'quote' | 'divider' | 'formula' | 'task-list' | 'image' | 'link';
+type ToolbarOverflowAction = 'table' | 'quote' | 'divider' | 'formula';
+
+const textColorOptions = ['#1d1d1f', '#0066cc', '#d93025', '#188038', '#b25f00', '#7b1fa2'];
+const highlightColorOptions = ['#fff2a8', '#ffd8a8', '#c8f7c5', '#c7e7ff', '#f6c3ff', '#ffd4d4'];
 
 const emptyMeta: PostMeta = {
   title: '',
@@ -362,7 +365,10 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
   const [imageAlt, setImageAlt] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [overflowAction, setOverflowAction] = useState<ToolbarOverflowAction | ''>('');
-  const preview = useMemo(() => renderMarkdownPreview(body || ''), [body]);
+  const [showTextColorPalette, setShowTextColorPalette] = useState(false);
+  const [showHighlightPalette, setShowHighlightPalette] = useState(false);
+  const deferredBody = useDeferredValue(body);
+  const preview = useMemo(() => renderMarkdownPreview(deferredBody || ''), [deferredBody]);
   const initialSnapshot = useMemo(() => JSON.stringify({
     meta: {
       ...cleanMeta({
@@ -383,8 +389,8 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
   }), [body, meta, path]);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const colorInputRef = useRef<HTMLInputElement | null>(null);
-  const highlightInputRef = useRef<HTMLInputElement | null>(null);
+  const textColorPaletteRef = useRef<HTMLDivElement | null>(null);
+  const highlightPaletteRef = useRef<HTMLDivElement | null>(null);
   const historyRef = useRef<HistoryState>({ past: [], future: [] });
   const suppressHistoryRef = useRef(false);
   const savedSnapshotRef = useRef('');
@@ -434,6 +440,22 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (showTextColorPalette && textColorPaletteRef.current && !textColorPaletteRef.current.contains(target)) {
+        setShowTextColorPalette(false);
+      }
+      if (showHighlightPalette && highlightPaletteRef.current && !highlightPaletteRef.current.contains(target)) {
+        setShowHighlightPalette(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showHighlightPalette, showTextColorPalette]);
 
   function updateMeta(key: keyof PostMeta, value: PostMeta[keyof PostMeta]) {
     setMeta((current) => ({ ...current, [key]: value }));
@@ -651,10 +673,12 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
   }
 
   function insertColor(color: string) {
+    setShowTextColorPalette(false);
     transformSelection((selected) => `<span style="color: ${color};">${selected || '彩色文字'}</span>`);
   }
 
   function insertHighlight(color: string) {
+    setShowHighlightPalette(false);
     transformSelection((selected) => `<mark style="background-color: ${color}; color: inherit;">${selected || '高亮文字'}</mark>`);
   }
 
@@ -670,14 +694,6 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
 
   function runOverflowAction(value: ToolbarOverflowAction) {
     setOverflowAction('');
-    if (value === 'color') {
-      colorInputRef.current?.click();
-      return;
-    }
-    if (value === 'highlight') {
-      highlightInputRef.current?.click();
-      return;
-    }
     if (value === 'table') {
       insertTable();
       return;
@@ -693,17 +709,6 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
     if (value === 'formula') {
       transformSelection((selected) => `$$\n${selected.trim() || 'E = mc^2'}\n$$`);
       return;
-    }
-    if (value === 'task-list') {
-      transformSelection((selected) => toggleLinePrefix(selected, '- [ ] '));
-      return;
-    }
-    if (value === 'image') {
-      openImagePanel();
-      return;
-    }
-    if (value === 'link') {
-      insertLink();
     }
   }
 
@@ -920,7 +925,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
             <ToolbarButton title="格式刷" onClick={applyBrush} active={Boolean(brushStyle)}><Paintbrush2 size={16} /></ToolbarButton>
             <ToolbarButton title="清除样式" onClick={clearStyles}><Eraser size={16} /></ToolbarButton>
 
-            <select className="editor-toolbar-select min-w-[148px]" value={insertValue} onChange={(event) => {
+            <select className="editor-toolbar-select min-w-[124px]" value={insertValue} onChange={(event) => {
               const value = event.target.value as BlockInsertOption | '';
               setInsertValue(value);
               if (value) insertBlock(value);
@@ -944,6 +949,32 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
             <ToolbarButton title="斜体" onClick={() => transformSelection((selected) => toggleWrap(selected, '*'))}><Italic size={16} /></ToolbarButton>
             <ToolbarButton title="删除线" onClick={() => transformSelection((selected) => toggleWrap(selected, '~~'))}><Strikethrough size={16} /></ToolbarButton>
             <ToolbarButton title="下划线" onClick={() => transformSelection((selected) => toggleWrap(selected, '<u>', '</u>'))}><Underline size={16} /></ToolbarButton>
+            <div className="relative" ref={textColorPaletteRef}>
+              <ToolbarButton title="字体颜色" onClick={() => {
+                setShowTextColorPalette((current) => !current);
+                setShowHighlightPalette(false);
+              }}><span className="text-[15px] font-semibold">A</span></ToolbarButton>
+              {showTextColorPalette ? (
+                <div className="absolute left-0 top-[calc(100%+8px)] z-20 grid grid-cols-3 gap-2 rounded-[14px] border border-line bg-canvas p-3 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
+                  {textColorOptions.map((color) => (
+                    <button key={color} type="button" aria-label={`选择颜色 ${color}`} onClick={() => insertColor(color)} className="h-8 w-8 rounded-full border border-line transition hover:scale-105" style={{ backgroundColor: color }} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="relative" ref={highlightPaletteRef}>
+              <ToolbarButton title="突出显示颜色" onClick={() => {
+                setShowHighlightPalette((current) => !current);
+                setShowTextColorPalette(false);
+              }}><span className="text-[15px]">🖍</span></ToolbarButton>
+              {showHighlightPalette ? (
+                <div className="absolute left-0 top-[calc(100%+8px)] z-20 grid grid-cols-3 gap-2 rounded-[14px] border border-line bg-canvas p-3 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
+                  {highlightColorOptions.map((color) => (
+                    <button key={color} type="button" aria-label={`选择高亮 ${color}`} onClick={() => insertHighlight(color)} className="h-8 w-8 rounded-full border border-line transition hover:scale-105" style={{ backgroundColor: color }} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <ToolbarButton title="无序列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- '))}><List size={16} /></ToolbarButton>
             <ToolbarButton title="有序列表" onClick={() => transformSelection((selected) => toggleOrderedList(selected))}><ListOrdered size={16} /></ToolbarButton>
 
@@ -957,17 +988,12 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               <option value="decrease">减少</option>
             </select>
 
-            <select className="editor-toolbar-select min-w-[108px] ml-auto" value={overflowAction} onChange={(event) => {
+            <select className="editor-toolbar-select min-w-[92px] ml-auto" value={overflowAction} onChange={(event) => {
               const value = event.target.value as ToolbarOverflowAction | '';
               setOverflowAction(value);
               if (value) runOverflowAction(value);
             }}>
               <option value="">更多</option>
-              <option value="task-list">任务列表</option>
-              <option value="image">插入图片</option>
-              <option value="link">插入链接</option>
-              <option value="color">字体颜色</option>
-              <option value="highlight">突出显示</option>
               <option value="table">插入表格</option>
               <option value="quote">引用</option>
               <option value="divider">分割线</option>
@@ -1064,19 +1090,6 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               if (file) uploadImage(file);
               event.target.value = '';
             }}
-          />
-          <input
-            ref={colorInputRef}
-            type="color"
-            className="hidden"
-            onChange={(event) => insertColor(event.target.value)}
-          />
-          <input
-            ref={highlightInputRef}
-            type="color"
-            className="hidden"
-            value="#fff2a8"
-            onChange={(event) => insertHighlight(event.target.value)}
           />
         </div>
 
