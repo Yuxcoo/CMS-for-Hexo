@@ -125,8 +125,7 @@ select {
   top: 0;
   z-index: 10;
   overflow: visible;
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
+  border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(var(--color-canvas), 0.98), rgba(var(--color-canvas), 0.94));
   backdrop-filter: blur(16px);
@@ -139,8 +138,7 @@ select {
   padding: 10px 12px;
   align-items: center;
   overflow: visible;
-  border-top-left-radius: inherit;
-  border-top-right-radius: inherit;
+  border-radius: inherit;
 }
 
 .editor-toolbar-single-line {

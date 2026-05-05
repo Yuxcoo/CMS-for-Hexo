@@ -28,13 +28,14 @@ async function enrichLatest(deps: DependencyVersion[]): Promise<DependencyVersio
   return Promise.all(
     deps.map(async (dep) => {
       if (dep.current.includes('folder') || dep.current === 'unknown') return dep;
-      const latest = await getLatestVersion(dep.name);
+      const lookupName = dep.packageName || dep.name;
+      const latest = await getLatestVersion(lookupName);
       if (!latest) return dep;
       return {
         ...dep,
         latest,
         updateHint: cleanVersion(dep.current) === latest ? 'ok' : 'maybe-outdated',
-        canUpgrade: dep.source === 'dependencies' || dep.source === 'devDependencies' || (dep.source === 'theme' && dep.packageName?.startsWith('hexo-theme-'))
+        canUpgrade: dep.source === 'dependencies' || dep.source === 'devDependencies' || (dep.source === 'theme' && lookupName.startsWith('hexo-theme-'))
       };
     })
   );
