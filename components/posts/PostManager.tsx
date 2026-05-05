@@ -113,7 +113,7 @@ export function PostManager({ kind }: { kind: PostKind }) {
       <div>
         {loading ? <div className="apple-message">加载中...</div> : <PostList posts={items} activePath={active?.path} kind={kind} onSelect={select} onReorder={reorder} onOrderMeta={updateOrderMeta} />}
       </div>
-      <PostEditor kind={kind} initial={active} onSaved={loadList} onDeleted={() => { setActive(undefined); loadList(); }} onDirtyChange={setDirty} registerDraftSaver={setDraftSaver} />
+      <PostEditor kind={kind} initial={active} onSaved={loadList} onDeleted={() => { setActive(undefined); loadList(); }} onDirtyChange={setDirty} registerDraftSaver={(saver) => setDraftSaver(() => saver)} />
       {leavePromptOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/28 px-4">
           <div className="w-full max-w-[460px] rounded-[18px] border border-line bg-canvas p-5 shadow-2xl">

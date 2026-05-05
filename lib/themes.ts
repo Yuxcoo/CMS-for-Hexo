@@ -302,13 +302,46 @@ export async function installTheme(input: InstallThemeInput) {
 }
 
 export async function searchNpmThemes(query: string): Promise<{ items: NpmThemeSearchItem[] }> {
-  const text = `${query.trim() || 'hexo-theme'} keywords:hexo-theme`;
-  const response = await fetch(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(text)}&size=10`, {
-    headers: { Accept: 'application/json' },
-    next: { revalidate: 60 * 30 }
-  });
-  if (!response.ok) throw new Error('搜索 npm 主题失败');
-  const result = await response.json() as {
+  const normalizedQuery = query.trim();
+  const searchText = normalizedQuery ? `${normalizedQuery} hexo theme` : 'hexo theme';
+
+  const [searchResponse, exactPackage] = await Promise.all([
+    fetch(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(searchText)}&size=24`, {
+      headers: { Accept: 'application/json' },
+      next: { revalidate: 60 * 30 }
+    }),
+    normalizedQuery && !normalizedQuery.includes('hexo-theme')
+      ? fetch(`https://registry.npmjs.org/${encodeURIComponent(`hexo-theme-${normalizedQuery}`)}`, {
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 60 * 30 }
+      }).then(async (response) => {
+        if (!response.ok) return null;
+        const body = await response.json() as {
+          name?: string;
+          description?: string;
+          'dist-tags'?: { latest?: string };
+          homepage?: string;
+          repository?: { url?: string } | string;
+          time?: Record<string, string>;
+        };
+        return {
+          packageName: body.name || `hexo-theme-${normalizedQuery}`,
+          themeName: themeNameFromPackageName(body.name || `hexo-theme-${normalizedQuery}`),
+          version: body['dist-tags']?.latest || 'unknown',
+          description: body.description,
+          date: body.time?.[body['dist-tags']?.latest || ''] || body.time?.modified,
+          links: {
+            npm: body.name ? `https://www.npmjs.com/package/${body.name}` : undefined,
+            homepage: body.homepage,
+            repository: typeof body.repository === 'string' ? body.repository : body.repository?.url
+          }
+        } satisfies NpmThemeSearchItem;
+      }).catch(() => null)
+      : Promise.resolve(null)
+  ]);
+
+  if (!searchResponse.ok) throw new Error('搜索 npm 主题失败');
+  const result = await searchResponse.json() as {
     objects?: Array<{
       package: {
         name: string;
@@ -319,9 +352,11 @@ export async function searchNpmThemes(query: string): Promise<{ items: NpmThemeS
       };
     }>;
   };
-  const items = (result.objects || [])
+
+  const keyword = normalizedQuery.toLowerCase();
+  const candidates = (result.objects || [])
     .map((entry) => entry.package)
-    .filter((pkg) => pkg.name.includes('hexo-theme'))
+    .filter((pkg) => pkg.name.includes('hexo-theme') || pkg.description?.toLowerCase().includes('hexo theme'))
     .map((pkg) => ({
       packageName: pkg.name,
       themeName: themeNameFromPackageName(pkg.name),
@@ -329,8 +364,23 @@ export async function searchNpmThemes(query: string): Promise<{ items: NpmThemeS
       description: pkg.description,
       date: pkg.date,
       links: pkg.links
-    }));
-  return { items };
+    } satisfies NpmThemeSearchItem));
+
+  const merged = exactPackage ? [exactPackage, ...candidates] : candidates;
+  const deduped = merged.filter((item, index, list) => list.findIndex((entry) => entry.packageName === item.packageName) === index);
+  const ranked = keyword
+    ? deduped.sort((a, b) => {
+      const aExact = Number(a.packageName.toLowerCase() === `hexo-theme-${keyword}` || a.themeName.toLowerCase() === keyword);
+      const bExact = Number(b.packageName.toLowerCase() === `hexo-theme-${keyword}` || b.themeName.toLowerCase() === keyword);
+      if (aExact !== bExact) return bExact - aExact;
+      const aIncludes = Number(a.packageName.toLowerCase().includes(keyword) || a.themeName.toLowerCase().includes(keyword));
+      const bIncludes = Number(b.packageName.toLowerCase().includes(keyword) || b.themeName.toLowerCase().includes(keyword));
+      if (aIncludes !== bIncludes) return bIncludes - aIncludes;
+      return a.packageName.localeCompare(b.packageName);
+    })
+    : deduped;
+
+  return { items: ranked.slice(0, 24) };
 }
 
 export async function installNpmTheme(input: { packageName: string; version?: string; activate?: boolean }) {

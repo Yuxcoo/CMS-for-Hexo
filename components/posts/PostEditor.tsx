@@ -75,7 +75,7 @@ type BlockInsertOption =
 type BlockStyleOption = 'paragraph' | 'h1' | 'h2' | 'h3' | 'quote' | 'code';
 type IndentOption = 'increase' | 'decrease';
 type ImageInsertMode = 'upload' | 'link';
-type ToolbarOverflowAction = 'color' | 'highlight' | 'table' | 'quote' | 'divider' | 'formula';
+type ToolbarOverflowAction = 'color' | 'highlight' | 'table' | 'quote' | 'divider' | 'formula' | 'task-list' | 'image' | 'link';
 
 const emptyMeta: PostMeta = {
   title: '',
@@ -692,6 +692,18 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
     }
     if (value === 'formula') {
       transformSelection((selected) => `$$\n${selected.trim() || 'E = mc^2'}\n$$`);
+      return;
+    }
+    if (value === 'task-list') {
+      transformSelection((selected) => toggleLinePrefix(selected, '- [ ] '));
+      return;
+    }
+    if (value === 'image') {
+      openImagePanel();
+      return;
+    }
+    if (value === 'link') {
+      insertLink();
     }
   }
 
@@ -934,7 +946,6 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
             <ToolbarButton title="下划线" onClick={() => transformSelection((selected) => toggleWrap(selected, '<u>', '</u>'))}><Underline size={16} /></ToolbarButton>
             <ToolbarButton title="无序列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- '))}><List size={16} /></ToolbarButton>
             <ToolbarButton title="有序列表" onClick={() => transformSelection((selected) => toggleOrderedList(selected))}><ListOrdered size={16} /></ToolbarButton>
-            <ToolbarButton title="任务列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- [ ] '))}><ListChecks size={16} /></ToolbarButton>
 
             <select className="editor-toolbar-select min-w-[96px]" defaultValue="" onChange={(event) => {
               const value = event.target.value as IndentOption | '';
@@ -946,15 +957,15 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               <option value="decrease">减少</option>
             </select>
 
-            <ToolbarButton title="插入图片" onClick={openImagePanel}><ImagePlus size={16} /></ToolbarButton>
-            <ToolbarButton title="插入链接" onClick={insertLink}><Link2 size={16} /></ToolbarButton>
-
             <select className="editor-toolbar-select min-w-[108px] ml-auto" value={overflowAction} onChange={(event) => {
               const value = event.target.value as ToolbarOverflowAction | '';
               setOverflowAction(value);
               if (value) runOverflowAction(value);
             }}>
               <option value="">更多</option>
+              <option value="task-list">任务列表</option>
+              <option value="image">插入图片</option>
+              <option value="link">插入链接</option>
               <option value="color">字体颜色</option>
               <option value="highlight">突出显示</option>
               <option value="table">插入表格</option>
