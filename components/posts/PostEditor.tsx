@@ -917,7 +917,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
         {message ? <p className="mx-4 mb-4 apple-message break-all">{message}</p> : null}
       </section>
 
-      <section className="apple-panel overflow-hidden">
+      <section className="apple-panel overflow-visible">
         <div className="editor-toolbar-wrap border-b border-line">
           <div className="editor-toolbar editor-toolbar-single-line">
             <ToolbarButton title="撤销" onClick={undo} disabled={!historyRef.current.past.length}><Undo2 size={16} /></ToolbarButton>
@@ -925,7 +925,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
             <ToolbarButton title="格式刷" onClick={applyBrush} active={Boolean(brushStyle)}><Paintbrush2 size={16} /></ToolbarButton>
             <ToolbarButton title="清除样式" onClick={clearStyles}><Eraser size={16} /></ToolbarButton>
 
-            <select className="editor-toolbar-select min-w-[124px]" value={insertValue} onChange={(event) => {
+            <select className="editor-toolbar-select w-[94px]" value={insertValue} onChange={(event) => {
               const value = event.target.value as BlockInsertOption | '';
               setInsertValue(value);
               if (value) insertBlock(value);
@@ -936,7 +936,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               ))}
             </select>
 
-            <select className="editor-toolbar-select min-w-[112px]" value={blockValue} onChange={(event) => applyBlockStyle(event.target.value as BlockStyleOption)}>
+            <select className="editor-toolbar-select w-[82px]" value={blockValue} onChange={(event) => applyBlockStyle(event.target.value as BlockStyleOption)}>
               <option value="paragraph">正文</option>
               <option value="h1">一级标题</option>
               <option value="h2">二级标题</option>
@@ -978,7 +978,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
             <ToolbarButton title="无序列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- '))}><List size={16} /></ToolbarButton>
             <ToolbarButton title="有序列表" onClick={() => transformSelection((selected) => toggleOrderedList(selected))}><ListOrdered size={16} /></ToolbarButton>
 
-            <select className="editor-toolbar-select min-w-[96px]" defaultValue="" onChange={(event) => {
+            <select className="editor-toolbar-select w-[78px]" defaultValue="" onChange={(event) => {
               const value = event.target.value as IndentOption | '';
               if (value) changeIndent(value);
               event.target.value = '';
@@ -988,7 +988,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               <option value="decrease">减少</option>
             </select>
 
-            <select className="editor-toolbar-select min-w-[92px] ml-auto" value={overflowAction} onChange={(event) => {
+            <select className="editor-toolbar-select w-[72px] ml-auto" value={overflowAction} onChange={(event) => {
               const value = event.target.value as ToolbarOverflowAction | '';
               setOverflowAction(value);
               if (value) runOverflowAction(value);
