@@ -24,15 +24,24 @@ function cleanVersion(value: string): string {
   return value.replace(/^[~^<>= ]+/, '').trim();
 }
 
+function normalizeThemePackageName(themeName: string, packageName?: string): string {
+  if (packageName?.startsWith('hexo-theme-')) return packageName;
+  if (themeName.startsWith('hexo-theme-')) return themeName;
+  return `hexo-theme-${themeName}`;
+}
+
 async function enrichLatest(deps: DependencyVersion[]): Promise<DependencyVersion[]> {
   return Promise.all(
     deps.map(async (dep) => {
       if (dep.current.includes('folder') || dep.current === 'unknown') return dep;
-      const lookupName = dep.packageName || dep.name;
+      const lookupName = dep.source === 'theme'
+        ? normalizeThemePackageName(dep.name, dep.packageName)
+        : dep.packageName || dep.name;
       const latest = await getLatestVersion(lookupName);
       if (!latest) return dep;
       return {
         ...dep,
+        packageName: lookupName,
         latest,
         updateHint: cleanVersion(dep.current) === latest ? 'ok' : 'maybe-outdated',
         canUpgrade: dep.source === 'dependencies' || dep.source === 'devDependencies' || (dep.source === 'theme' && lookupName.startsWith('hexo-theme-'))
@@ -100,11 +109,17 @@ export async function getVersionReport(): Promise<VersionReport> {
   const all = collectDeps(packageJson);
   const themeName = await detectThemeFromConfig();
   const themeFromFolder = await detectThemeVersion(themeName);
-  const themeFromPackage = all.find((dep) => dep.source === 'theme');
+  const normalizedActiveThemePackage = themeName ? normalizeThemePackageName(themeName) : undefined;
+  const themeFromPackage = all.find((dep) => dep.source === 'theme' && (
+    dep.name === normalizedActiveThemePackage ||
+    dep.packageName === normalizedActiveThemePackage ||
+    dep.name === themeName ||
+    dep.packageName === themeName
+  )) || all.find((dep) => dep.source === 'theme');
   const hexo = all.find((dep) => dep.name === 'hexo');
   const plugins = await enrichLatest(all.filter((dep) => dep.name.startsWith('hexo-') && dep.name !== 'hexo' && dep.source !== 'theme'));
   const enrichedHexo = hexo ? (await enrichLatest([hexo]))[0] : undefined;
-  const themePackageName = themeFromPackage?.packageName || themeFromFolder?.packageName;
+  const themePackageName = themeName ? normalizeThemePackageName(themeName, themeFromPackage?.packageName || themeFromFolder?.packageName) : undefined;
   const theme = themeFromFolder || themeFromPackage;
   const themeCandidate = theme ? { ...theme, name: themePackageName || theme.name } : undefined;
   const enrichedTheme = themeCandidate ? (await enrichLatest([themeCandidate]))[0] : undefined;
