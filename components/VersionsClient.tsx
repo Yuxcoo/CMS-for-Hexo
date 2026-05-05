@@ -8,6 +8,9 @@ import type { DependencyVersion, VersionReport } from '@/types/version';
 function VersionRow({ item, onUpgrade, upgrading }: { item: DependencyVersion; onUpgrade: (item: DependencyVersion) => void; upgrading: boolean }) {
   const state = item.updateHint === 'maybe-outdated' ? '可能可更新' : item.updateHint === 'ok' ? '最新' : '未知';
   const stateClass = item.updateHint === 'ok' ? 'text-success' : item.updateHint === 'maybe-outdated' ? 'text-blue' : 'text-muted';
+  const upgradeLabel = item.source === 'theme'
+    ? (item.canUpgrade ? '可升级' : '仅本地检测')
+    : '-';
   return (
     <tr className="border-t border-line">
       <td className="px-3 py-3 font-semibold text-ink">{item.name}</td>
@@ -21,7 +24,7 @@ function VersionRow({ item, onUpgrade, upgrading }: { item: DependencyVersion; o
             <ArrowUpCircle size={15} />{upgrading ? '升级中...' : '升级'}
           </Button>
         ) : (
-          <span className="text-[12px] text-muted">{item.source === 'theme' ? '主题仅检测' : '-'}</span>
+          <span className="text-[12px] text-muted">{upgradeLabel}</span>
         )}
       </td>
     </tr>
@@ -47,7 +50,7 @@ export function VersionsClient() {
     const response = await fetch('/api/versions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'upgrade', name: item.name, source: item.source, version: item.latest })
+      body: JSON.stringify({ action: 'upgrade', name: item.packageName || item.name, source: item.source, version: item.latest })
     });
     await response.json();
     setUpgradingName('');

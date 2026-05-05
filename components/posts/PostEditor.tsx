@@ -367,6 +367,8 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
   const [overflowAction, setOverflowAction] = useState<ToolbarOverflowAction | ''>('');
   const [showTextColorPalette, setShowTextColorPalette] = useState(false);
   const [showHighlightPalette, setShowHighlightPalette] = useState(false);
+  const [customTextColor, setCustomTextColor] = useState(textColorOptions[0]);
+  const [customHighlightColor, setCustomHighlightColor] = useState(highlightColorOptions[0]);
   const deferredBody = useDeferredValue(body);
   const preview = useMemo(() => renderMarkdownPreview(deferredBody || ''), [deferredBody]);
   const initialSnapshot = useMemo(() => JSON.stringify({
@@ -674,11 +676,13 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
 
   function insertColor(color: string) {
     setShowTextColorPalette(false);
+    setCustomTextColor(color);
     transformSelection((selected) => `<span style="color: ${color};">${selected || '彩色文字'}</span>`);
   }
 
   function insertHighlight(color: string) {
     setShowHighlightPalette(false);
+    setCustomHighlightColor(color);
     transformSelection((selected) => `<mark style="background-color: ${color}; color: inherit;">${selected || '高亮文字'}</mark>`);
   }
 
@@ -925,7 +929,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
             <ToolbarButton title="格式刷" onClick={applyBrush} active={Boolean(brushStyle)}><Paintbrush2 size={16} /></ToolbarButton>
             <ToolbarButton title="清除样式" onClick={clearStyles}><Eraser size={16} /></ToolbarButton>
 
-            <select className="editor-toolbar-select w-[94px]" value={insertValue} onChange={(event) => {
+            <select className="editor-toolbar-select w-[88px]" value={insertValue} onChange={(event) => {
               const value = event.target.value as BlockInsertOption | '';
               setInsertValue(value);
               if (value) insertBlock(value);
@@ -936,7 +940,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               ))}
             </select>
 
-            <select className="editor-toolbar-select w-[82px]" value={blockValue} onChange={(event) => applyBlockStyle(event.target.value as BlockStyleOption)}>
+            <select className="editor-toolbar-select w-[74px]" value={blockValue} onChange={(event) => applyBlockStyle(event.target.value as BlockStyleOption)}>
               <option value="paragraph">正文</option>
               <option value="h1">一级标题</option>
               <option value="h2">二级标题</option>
@@ -955,10 +959,28 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
                 setShowHighlightPalette(false);
               }}><span className="text-[15px] font-semibold">A</span></ToolbarButton>
               {showTextColorPalette ? (
-                <div className="absolute left-0 top-[calc(100%+8px)] z-20 grid grid-cols-3 gap-2 rounded-[14px] border border-line bg-canvas p-3 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
-                  {textColorOptions.map((color) => (
-                    <button key={color} type="button" aria-label={`选择颜色 ${color}`} onClick={() => insertColor(color)} className="h-8 w-8 rounded-full border border-line transition hover:scale-105" style={{ backgroundColor: color }} />
-                  ))}
+                <div className="absolute left-0 top-[calc(100%+8px)] z-30 grid min-w-[196px] gap-3 rounded-[14px] border border-line bg-canvas p-3 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
+                  <div className="grid grid-cols-3 gap-2">
+                    {textColorOptions.map((color) => (
+                      <button key={color} type="button" aria-label={`选择颜色 ${color}`} onClick={() => insertColor(color)} className="h-8 w-8 rounded-full border border-line transition hover:scale-105" style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label="自定义字体颜色"
+                      value={customTextColor}
+                      onChange={(event) => setCustomTextColor(event.target.value)}
+                      className="h-9 w-11 cursor-pointer rounded-[10px] border border-line bg-canvas p-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => insertColor(customTextColor)}
+                      className="inline-flex min-h-9 flex-1 items-center justify-center rounded-[10px] border border-line px-3 text-[13px] text-ink transition hover:border-blue hover:bg-blue/5"
+                    >
+                      应用自定义颜色
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -968,17 +990,35 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
                 setShowTextColorPalette(false);
               }}><span className="text-[15px]">🖍</span></ToolbarButton>
               {showHighlightPalette ? (
-                <div className="absolute left-0 top-[calc(100%+8px)] z-20 grid grid-cols-3 gap-2 rounded-[14px] border border-line bg-canvas p-3 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
-                  {highlightColorOptions.map((color) => (
-                    <button key={color} type="button" aria-label={`选择高亮 ${color}`} onClick={() => insertHighlight(color)} className="h-8 w-8 rounded-full border border-line transition hover:scale-105" style={{ backgroundColor: color }} />
-                  ))}
+                <div className="absolute left-0 top-[calc(100%+8px)] z-30 grid min-w-[196px] gap-3 rounded-[14px] border border-line bg-canvas p-3 shadow-[0_16px_30px_rgba(15,23,42,0.16)]">
+                  <div className="grid grid-cols-3 gap-2">
+                    {highlightColorOptions.map((color) => (
+                      <button key={color} type="button" aria-label={`选择高亮 ${color}`} onClick={() => insertHighlight(color)} className="h-8 w-8 rounded-full border border-line transition hover:scale-105" style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      aria-label="自定义高亮颜色"
+                      value={customHighlightColor}
+                      onChange={(event) => setCustomHighlightColor(event.target.value)}
+                      className="h-9 w-11 cursor-pointer rounded-[10px] border border-line bg-canvas p-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => insertHighlight(customHighlightColor)}
+                      className="inline-flex min-h-9 flex-1 items-center justify-center rounded-[10px] border border-line px-3 text-[13px] text-ink transition hover:border-blue hover:bg-blue/5"
+                    >
+                      应用自定义高亮
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
             <ToolbarButton title="无序列表" onClick={() => transformSelection((selected) => toggleLinePrefix(selected, '- '))}><List size={16} /></ToolbarButton>
             <ToolbarButton title="有序列表" onClick={() => transformSelection((selected) => toggleOrderedList(selected))}><ListOrdered size={16} /></ToolbarButton>
 
-            <select className="editor-toolbar-select w-[78px]" defaultValue="" onChange={(event) => {
+            <select className="editor-toolbar-select w-[86px]" defaultValue="" onChange={(event) => {
               const value = event.target.value as IndentOption | '';
               if (value) changeIndent(value);
               event.target.value = '';
@@ -988,7 +1028,7 @@ export function PostEditor({ kind, initial, onSaved, onDeleted, onDirtyChange, r
               <option value="decrease">减少</option>
             </select>
 
-            <select className="editor-toolbar-select w-[72px] ml-auto" value={overflowAction} onChange={(event) => {
+            <select className="editor-toolbar-select w-[86px]" value={overflowAction} onChange={(event) => {
               const value = event.target.value as ToolbarOverflowAction | '';
               setOverflowAction(value);
               if (value) runOverflowAction(value);

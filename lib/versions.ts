@@ -103,14 +103,23 @@ export async function getVersionReport(): Promise<VersionReport> {
   const hexo = all.find((dep) => dep.name === 'hexo');
   const plugins = await enrichLatest(all.filter((dep) => dep.name.startsWith('hexo-') && dep.name !== 'hexo' && dep.source !== 'theme'));
   const enrichedHexo = hexo ? (await enrichLatest([hexo]))[0] : undefined;
-  const theme = themeFromPackage || themeFromFolder;
-  const themeCandidate = theme ? { ...theme, name: theme.packageName || theme.name } : undefined;
+  const themePackageName = themeFromPackage?.packageName || themeFromFolder?.packageName;
+  const theme = themeFromFolder || themeFromPackage;
+  const themeCandidate = theme ? { ...theme, name: themePackageName || theme.name } : undefined;
   const enrichedTheme = themeCandidate ? (await enrichLatest([themeCandidate]))[0] : undefined;
-  const normalizedTheme = enrichedTheme ? { ...enrichedTheme, name: theme?.name || enrichedTheme.name, canUpgrade: false } : undefined;
-  const combined = normalizedTheme && !all.some((dep) => dep.source === 'theme' || dep.name === normalizedTheme.name) ? [...all, normalizedTheme] : all.map((dep) => {
-    if (dep.source !== 'theme' || !normalizedTheme) return dep;
-    return { ...dep, latest: normalizedTheme.latest, updateHint: normalizedTheme.updateHint, canUpgrade: dep.packageName?.startsWith('hexo-theme-') };
-  });
+  const normalizedTheme = enrichedTheme
+    ? {
+      ...enrichedTheme,
+      name: themeFromFolder?.name || theme?.name || enrichedTheme.name,
+      current: themeFromFolder?.current || theme?.current || enrichedTheme.current,
+      packageName: themePackageName || enrichedTheme.packageName,
+      canUpgrade: Boolean(themePackageName?.startsWith('hexo-theme-'))
+    }
+    : undefined;
+  const combined = [
+    ...all.filter((dep) => dep.source !== 'theme'),
+    ...(normalizedTheme ? [normalizedTheme] : [])
+  ];
   return {
     packageManager: await detectPackageManager(),
     hexo: enrichedHexo,
@@ -118,7 +127,7 @@ export async function getVersionReport(): Promise<VersionReport> {
     plugins,
     all: uniqueDeps(await enrichLatest(combined)),
     checkedAt: new Date().toISOString(),
-    note: '当前版本来自仓库 package.json 和 themes/<active-theme>/package.json；latest 字段来自 npm registry。依赖支持一键写回 package.json 升级，自定义主题会优先展示自身 package.json 版本。'
+    note: '当前版本来自仓库 package.json 和 themes/<active-theme>/package.json；latest 字段来自 npm registry。依赖与 npm 安装主题支持一键写回 package.json 升级，自定义本地主题会优先展示自身 package.json 版本。'
   };
 }
 
